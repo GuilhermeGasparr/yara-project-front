@@ -1,13 +1,15 @@
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useLoginForm } from "@/hooks/useLoginForm";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -19,7 +21,6 @@ import {
 } from "react-native";
 
 // ─── Ícone SVG inline — círculo + ponteiro de relógio (logo sentinela) ───────
-// Usamos View + borders para manter zero dependências de SVG
 function SentinelaLogo() {
   return (
     <View style={styles.logoIconWrap}>
@@ -28,6 +29,136 @@ function SentinelaLogo() {
         <View style={styles.logoHandShort} />
         <View style={styles.logoDot} />
       </View>
+    </View>
+  );
+}
+
+// ─── Componente Segmented Control Moderno (RoleSelector) ─────────────────────
+interface RoleSelectorProps {
+  selectedRole: "ACS/ACE" | "UBS" | "";
+  onChangeRole: (role: "ACS/ACE" | "UBS") => void;
+  hasError?: boolean;
+}
+
+function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProps) {
+  const [containerWidth, setContainerWidth] = useState(0);
+  
+  // Referências de animação
+  const sliderAnim = useRef(new Animated.Value(0)).current;
+  const scaleACS = useRef(new Animated.Value(1)).current;
+  const scaleUBS = useRef(new Animated.Value(1)).current;
+  const fadeACS = useRef(new Animated.Value(0.6)).current;
+  const fadeUBS = useRef(new Animated.Value(0.6)).current;
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setContainerWidth(e.nativeEvent.layout.width);
+  };
+
+  useEffect(() => {
+    if (containerWidth === 0) return;
+
+    // Se não houver nada selecionado (""), deixa o indicador escondido ou na esquerda invisível
+    const targetValue = selectedRole === "UBS" ? containerWidth / 2 : 0;
+
+    Animated.spring(sliderAnim, {
+      toValue: targetValue,
+      useNativeDriver: true,
+      bounciness: 4,
+      speed: 12,
+    }).start();
+
+    Animated.timing(fadeACS, {
+      toValue: selectedRole === "ACS/ACE" ? 1 : 0.6,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(fadeUBS, {
+      toValue: selectedRole === "UBS" ? 1 : 0.6,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedRole, containerWidth]);
+
+  const onPressIn = (role: "ACS/ACE" | "UBS") => {
+    Animated.timing(role === "ACS/ACE" ? scaleACS : scaleUBS, {
+      toValue: 0.95,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const onPressOut = (role: "ACS/ACE" | "UBS") => {
+    Animated.timing(role === "ACS/ACE" ? scaleACS : scaleUBS, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const sliderWidth = containerWidth ? containerWidth / 2 - 4 : 0;
+  // O indicador só aparece se houver uma opção de fato selecionada
+  const showIndicator = selectedRole === "ACS/ACE" || selectedRole === "UBS";
+
+  return (
+    <View 
+      style={[
+        styles.selectorContainer, 
+        hasError && styles.selectorContainerError
+      ]} 
+      onLayout={handleLayout}
+    >
+      {containerWidth > 0 && showIndicator && (
+        <Animated.View
+          style={[
+            styles.sliderIndicator,
+            {
+              width: sliderWidth,
+              transform: [{ translateX: Animated.add(sliderAnim, 4) }],
+            },
+          ]}
+        />
+      )}
+
+      <Pressable
+        onPressIn={() => onPressIn("ACS/ACE")}
+        onPressOut={() => onPressOut("ACS/ACE")}
+        onPress={() => onChangeRole("ACS/ACE")}
+        style={styles.selectorOption}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: selectedRole === "ACS/ACE" }}
+      >
+        <Animated.View style={[styles.optionContent, { transform: [{ scale: scaleACS }], opacity: fadeACS }]}>
+          <Feather
+            name="users"
+            size={16}
+            color={selectedRole === "ACS/ACE" ? Colors.teal600 : Colors.gray400}
+          />
+          <Text style={[styles.selectorText, selectedRole === "ACS/ACE" && styles.selectorTextActive]}>
+            ACS / ACE
+          </Text>
+        </Animated.View>
+      </Pressable>
+
+      <Pressable
+        onPressIn={() => onPressIn("UBS")}
+        onPressOut={() => onPressOut("UBS")}
+        onPress={() => onChangeRole("UBS")}
+        style={styles.selectorOption}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: selectedRole === "UBS" }}
+      >
+        <Animated.View style={[styles.optionContent, { transform: [{ scale: scaleUBS }], opacity: fadeUBS }]}>
+          <Feather
+            name="home"
+            size={16}
+            color={selectedRole === "UBS" ? Colors.teal600 : Colors.gray400}
+          />
+          <Text style={[styles.selectorText, selectedRole === "UBS" && styles.selectorTextActive]}>
+            Equipe UBS
+          </Text>
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }
@@ -103,13 +234,17 @@ function Field({
             style={styles.eyeBtn}
             hitSlop={8}
           >
-            <Text style={styles.eyeText}>{showPassword ? "🙈" : "👁"}</Text>
+            <Feather 
+              name={showPassword ? "eye-off" : "eye"} 
+              size={18} 
+              color={Colors.gray400} 
+            />
           </Pressable>
         )}
       </View>
       {hasError && (
         <View style={styles.errorRow}>
-          <Text style={styles.errorIcon}>⚠</Text>
+          <Feather name="alert-circle" size={14} color={Colors.red400} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -131,31 +266,11 @@ export default function LoginScreen() {
 
   function shake() {
     Animated.sequence([
-      Animated.timing(shakeAnim, {
-        toValue: 8,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: -8,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 6,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: -6,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnim, {
-        toValue: 0,
-        duration: 60,
-        useNativeDriver: true,
-      }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
   }
 
@@ -172,8 +287,8 @@ export default function LoginScreen() {
       await signIn({
         email: form.email.trim().toLowerCase(),
         senha: form.senha,
-      });
-      // AuthProvider já setou o user; o _layout.tsx redireciona automaticamente
+        tipo: form.tipo, // Vinculado perfeitamente com seu hook
+      } as any);
       router.replace("../(tabs)");
     } catch (err: unknown) {
       const msg =
@@ -186,6 +301,8 @@ export default function LoginScreen() {
       setLoading(false);
     }
   }
+
+  const hasTipoError = touched.tipo && !!errors.tipo;
 
   return (
     <LinearGradient
@@ -221,6 +338,22 @@ export default function LoginScreen() {
               Acesso restrito a profissionais cadastrados
             </Text>
 
+            {/* Label do Seletor */}
+            <Text style={styles.fieldLabel}>Tipo de Usuário</Text>
+            
+            {/* Seletor conectado diretamente ao hook useLoginForm */}
+            <RoleSelector 
+              selectedRole={form.tipo} 
+              onChangeRole={(value) => handleChange("tipo", value)}
+              hasError={hasTipoError}
+            />
+            {hasTipoError && (
+              <View style={[styles.errorRow, { marginTop: -Spacing.md, marginBottom: Spacing.md }]}>
+                <Feather name="alert-circle" size={14} color={Colors.red400} />
+                <Text style={styles.errorText}>{errors.tipo}</Text>
+              </View>
+            )}
+
             <Field
               label="E-mail institucional"
               value={form.email}
@@ -251,7 +384,7 @@ export default function LoginScreen() {
             {/* Erro da API */}
             {apiError && (
               <View style={styles.apiErrorBox}>
-                <Text style={styles.apiErrorIcon}>✕</Text>
+                <Feather name="x-circle" size={16} color={Colors.red600} style={{ marginTop: 2 }} />
                 <Text style={styles.apiErrorText}>{apiError}</Text>
               </View>
             )}
@@ -376,6 +509,56 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  // Segmented Control (RoleSelector) Styles
+  selectorContainer: {
+    flexDirection: "row",
+    backgroundColor: Colors.gray100,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.gray100,
+    padding: 2,
+    marginBottom: Spacing.lg,
+    position: "relative",
+    alignItems: "center",
+    height: 48,
+  },
+  selectorContainerError: {
+    borderColor: Colors.red400,
+  },
+  sliderIndicator: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.sm - 2,
+    shadowColor: Colors.gray900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectorOption: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  optionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectorText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray400,
+  },
+  selectorTextActive: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
+
   // Card
   card: {
     backgroundColor: Colors.white,
@@ -440,18 +623,11 @@ const styles = StyleSheet.create({
   eyeBtn: {
     padding: Spacing.sm,
   },
-  eyeText: {
-    fontSize: 16,
-  },
   errorRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  errorIcon: {
-    fontSize: FontSize.xs,
-    color: Colors.red400,
+    gap: 6,
+    marginTop: 6,
   },
   errorText: {
     fontSize: FontSize.xs,
@@ -470,12 +646,6 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.red400,
     padding: Spacing.md,
     marginBottom: Spacing.md,
-  },
-  apiErrorIcon: {
-    fontSize: FontSize.sm,
-    color: Colors.red600,
-    fontWeight: "700",
-    marginTop: 1,
   },
   apiErrorText: {
     fontSize: FontSize.sm,

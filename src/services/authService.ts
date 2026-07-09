@@ -1,8 +1,7 @@
 import { LoginPayload, LoginResponse } from "@/types";
 
-// Troque pelo IP da sua máquina ao rodar no dispositivo físico
-// Ex: 'http://192.168.x.x:8000'
-const BASE_URL = "http://localhost:8000";
+// 1. Troque pelo link gerado pelo Ngrok que está no seu terminal
+const BASE_URL = "https://confutable-marybeth-throatily.ngrok-free.dev";
 
 /**
  * Faz login enviando email + senha como form-data (padrão OAuth2 do FastAPI)
@@ -12,12 +11,16 @@ export async function loginRequest(
   payload: LoginPayload,
 ): Promise<LoginResponse> {
   const form = new URLSearchParams();
-  form.append("username", payload.email); // FastAPI OAuth2 espera 'username'
+  form.append("username", payload.email);
   form.append("password", payload.senha);
 
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { 
+      "Content-Type": "application/x-www-form-urlencoded",
+      // 2. Adicione esta linha para pular o aviso do Ngrok nas chamadas POST
+      "ngrok-skip-browser-warning": "true" 
+    },
     body: form.toString(),
   });
 
@@ -36,7 +39,11 @@ export async function loginRequest(
  */
 export async function fetchMe(token: string) {
   const res = await fetch(`${BASE_URL}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 
+      Authorization: `Bearer ${token}`,
+      // 3. Adicione esta linha aqui também para as chamadas GET
+      "ngrok-skip-browser-warning": "true"
+    },
   });
 
   const data = await res.json();
