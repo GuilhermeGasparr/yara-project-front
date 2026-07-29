@@ -23,6 +23,7 @@ export type AuthUser = AgenteUser | UBSUser;
 export interface LoginPayload {
   email: string;
   senha: string;
+  tipo_login: string;
 }
 
 export interface LoginResponse {

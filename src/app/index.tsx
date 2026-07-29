@@ -287,7 +287,7 @@ export default function LoginScreen() {
       await signIn({
         email: form.email.trim().toLowerCase(),
         senha: form.senha,
-        tipo: form.tipo, // Vinculado perfeitamente com seu hook
+        tipo_login: form.tipo_login, // Vinculado perfeitamente com seu hook
       } as any);
       router.replace("../(tabs)");
     } catch (err: unknown) {
@@ -302,7 +302,7 @@ export default function LoginScreen() {
     }
   }
 
-  const hasTipoError = touched.tipo && !!errors.tipo;
+  const hasTipoError = touched.tipo_login && !!errors.tipo;
 
   return (
     <LinearGradient
@@ -343,8 +343,8 @@ export default function LoginScreen() {
             
             {/* Seletor conectado diretamente ao hook useLoginForm */}
             <RoleSelector 
-              selectedRole={form.tipo} 
-              onChangeRole={(value) => handleChange("tipo", value)}
+              selectedRole={form.tipo_login} 
+              onChangeRole={(value) => handleChange("tipo_login", value)}
               hasError={hasTipoError}
             />
             {hasTipoError && (

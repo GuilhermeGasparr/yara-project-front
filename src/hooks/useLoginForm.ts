@@ -3,7 +3,7 @@ import { useState } from 'react';
 interface LoginForm {
   email: string;
   senha: string;
-  tipo: "ACS/ACE" | "UBS" | "";
+  tipo_login: "ACS/ACE" | "UBS" | "";
 }
 
 interface LoginErrors {
@@ -18,7 +18,7 @@ export function useLoginForm() {
   const [form, setForm] = useState<LoginForm>({
     email: "",
     senha: "",
-    tipo: "",
+    tipo_login: "",
   });
 
   const [errors, setErrors] = useState<LoginErrors>({});
@@ -26,7 +26,7 @@ export function useLoginForm() {
   const [touched, setTouched] = useState<Record<keyof LoginForm, boolean>>({
     email: false,
     senha: false,
-    tipo: false,
+    tipo_login: false,
   });
 
 
@@ -45,7 +45,7 @@ export function useLoginForm() {
       errs.senha = 'A senha deve ter no mínimo 6 caracteres.';
     }
     
-    if(!f.tipo) {
+    if(!f.tipo_login) {
       errs.tipo = "Selecione o tipo de Usuário.";
     }
 
@@ -66,7 +66,7 @@ export function useLoginForm() {
   }
 
   function validateAll(): boolean {
-    setTouched({ email: true, senha: true, tipo: true });
+    setTouched({ email: true, senha: true, tipo_login: true });
     const errs = validate(form);
     setErrors(errs);
     return Object.keys(errs).length === 0;

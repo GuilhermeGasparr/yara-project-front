@@ -6,7 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { AuthUser, LoginPayload } from '@/types';
-import { fetchMe, loginRequest } from '@/services/authService';
+import {loginRequest } from '@/services/authService';
 import { deleteItem, getItem, saveItem } from '@/utils/storage';
 
 const TOKEN_KEY = 'sentinela_token';
@@ -31,11 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const stored = await getItem(TOKEN_KEY);
-        if (stored) {
-          const me = await fetchMe(stored);
-          setToken(stored);
-          setUser(me);
-        }
       } catch {
         await deleteItem(TOKEN_KEY);
       } finally {
@@ -46,10 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (payload: LoginPayload) => {
     const { access_token } = await loginRequest(payload);
-    const me = await fetchMe(access_token);
     await saveItem(TOKEN_KEY, access_token);
     setToken(access_token);
-    setUser(me);
   }, []);
 
   const signOut = useCallback(async () => {
