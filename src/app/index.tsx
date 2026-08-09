@@ -287,9 +287,15 @@ export default function LoginScreen() {
       await signIn({
         email: form.email.trim().toLowerCase(),
         senha: form.senha,
-        tipo_login: form.tipo_login, // Vinculado perfeitamente com seu hook
+        tipo_login: form.tipo_login,
       } as any);
-      router.replace("../(tabs)");
+
+      if(form.tipo_login == "ACS/ACE") {
+        router.replace("/(agente)");
+      } else if(form.tipo_login == "UBS") {
+        router.replace("/(ubs)");
+      }
+      
     } catch (err: unknown) {
       const msg =
         err instanceof Error
