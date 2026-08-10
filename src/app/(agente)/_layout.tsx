@@ -24,12 +24,24 @@ function ListIcon({ color }: { color: string }) {
   );
 }
 
-function MapIcon({ color }: { color: string }) {
+function BookIcon({ color }: { color: string }) {
   return (
-    <View style={[icon.wrap, { flexDirection: "row", gap: 2 }]}>
-      {[0.9, 1, 0.9].map((flex, i) => (
-        <View key={i} style={{ flex, backgroundColor: i === 1 ? color : `${color}88`, borderRadius: 2 }} />
-      ))}
+    <View style={[icon.wrap, { justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={{
+          width: 16,
+          height: 18,
+          borderWidth: 2,
+          borderColor: color,
+          borderRadius: 3,
+          paddingTop: 3,
+          paddingLeft: 2,
+          gap: 2,
+        }}
+      >
+        <View style={{ width: 8, height: 1.5, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 6, height: 1.5, backgroundColor: color, borderRadius: 1 }} />
+      </View>
     </View>
   );
 }
@@ -126,10 +138,10 @@ export default function AgenteLayout() {
       />
 
       <Tabs.Screen
-        name="map"
+        name="guide"
         options={{
-          title: "Mapa",
-          tabBarIcon: ({ color }) => <MapIcon color={"#18522a"} />,
+          title: "Guia",
+          tabBarIcon: ({ color }) => <BookIcon color={"#18522a"} />,
         }}
       />
 
@@ -142,7 +154,7 @@ export default function AgenteLayout() {
       />
 
       {/* Rotas que existem no filesystem mas não aparecem na tab bar */}
-      <Tabs.Screen name="guide" options={{ href: null }} />
+      <Tabs.Screen name="map" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -1,5 +1,5 @@
 import { getItem } from '@/utils/storage';
-
+import { Platform } from 'react-native';
 const BASE_URL = 'http://localhost:8000';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -74,31 +74,55 @@ export async function criarNotificacao(
   const headers = await authHeader();
 
   const form = new FormData();
-  form.append('nome', payload.nome);
-  form.append('tipo_evento', payload.tipo_evento);
-  form.append('categoria', payload.categoria);
+
+  form.append("nome", payload.nome);
+  form.append("tipo_evento", payload.tipo_evento);
+  form.append("categoria", payload.categoria);
+
   form.append(
-    'pessoas_animais_infectados_afetados',
+    "pessoas_animais_infectados_afetados",
     String(payload.pessoas_animais_infectados_afetados),
   );
-  form.append('local_ocorrencia', payload.local_ocorrencia);
-  form.append('continuidade_situacao', payload.continuidade_situacao);
-  form.append('descricao', payload.descricao);
-  form.append('status', payload.status);
-  form.append('rascunho', String(payload.rascunho));
+
+  form.append("local_ocorrencia", payload.local_ocorrencia);
+  form.append("continuidade_situacao", payload.continuidade_situacao);
+  form.append("descricao", payload.descricao);
+  form.append("status", payload.status);
+  form.append("rascunho", String(payload.rascunho));
 
   for (const media of payload.medias ?? []) {
-    form.append('medias', { uri: media.uri, name: media.name, type: media.type } as unknown as Blob);
+    if (Platform.OS === "web") {
+      const response = await fetch(media.uri);
+      const blob = await response.blob();
+
+      form.append("medias", blob, media.name);
+    } else {
+      form.append("medias", {
+        uri: media.uri,
+        name: media.name,
+        type: media.type,
+      } as any);
+    }
   }
 
-  const res = await fetch(`${BASE_URL}/agentes/criar_notificacao`, {
-    method: 'POST',
-    headers,  // NÃO setar Content-Type — fetch define o boundary do multipart automaticamente
-    body: form,
-  });
+  const res = await fetch(
+    `${BASE_URL}/agentes/criar_notificacao`,
+    {
+      method: "POST",
+      headers,
+      body: form,
+    },
+  );
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? 'Erro ao criar notificação.');
+
+  console.log("STATUS CRIAÇÃO:", res.status);
+  console.log("RESPOSTA CRIAÇÃO:", data);
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao criar notificação.");
+  }
+
   return data;
 }
 
@@ -112,19 +136,36 @@ export async function transcreverAudio(
   const headers = await authHeader();
 
   const form = new FormData();
-  form.append('audio', {
-    uri: audioUri,
-    name: filename,
-    type: 'audio/m4a',
-  } as unknown as Blob);
+
+  if (Platform.OS === "web") {
+    // No navegador, transforma a URI em um Blob real
+    const response = await fetch(audioUri);
+    const blob = await response.blob();
+
+    form.append("audio", blob, filename);
+  } else {
+    // Android / iOS: React Native aceita o objeto de arquivo
+    form.append("audio", {
+      uri: audioUri,
+      name: filename,
+      type: "audio/m4a",
+    } as any);
+  }
 
   const res = await fetch(`${BASE_URL}/agentes/transcricao_audio`, {
-    method: 'POST',
+    method: "POST",
     headers,
     body: form,
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? 'Erro na transcrição.');
+
+  console.log("STATUS TRANSCRIÇÃO:", res.status);
+  console.log("RESPOSTA TRANSCRIÇÃO:", data);
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro na transcrição.");
+  }
+
   return data.texto_transcrito as string;
 }

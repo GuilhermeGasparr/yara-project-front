@@ -3,6 +3,7 @@ import { QuickActionButton } from "@/components/QuickActionbutton";
 import { StatsCard } from "@/components/StatsCard";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { useFocusEffect } from "expo-router";
 import {
   listarNotificacoes,
   Notificacao,
@@ -38,19 +39,61 @@ function contarStatus(list: Notificacao[], status: NotificacaoStatus) {
 
 function PlusIcon() {
   return (
-    <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
-      <View style={{ position: "absolute", width: 2, height: 18, backgroundColor: Colors.white, borderRadius: 1 }} />
-      <View style={{ position: "absolute", height: 2, width: 18, backgroundColor: Colors.white, borderRadius: 1 }} />
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          width: 2,
+          height: 18,
+          backgroundColor: Colors.white,
+          borderRadius: 1,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          height: 2,
+          width: 18,
+          backgroundColor: Colors.white,
+          borderRadius: 1,
+        }}
+      />
     </View>
   );
 }
 
 function CalendarIcon() {
   return (
-    <View style={{ width: 20, height: 20, borderWidth: 1.8, borderColor: Colors.teal600, borderRadius: 4, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 }}>
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        borderWidth: 1.8,
+        borderColor: Colors.teal600,
+        borderRadius: 4,
+        alignItems: "center",
+        justifyContent: "flex-end",
+        paddingBottom: 2,
+      }}
+    >
       <View style={{ flexDirection: "row", gap: 3 }}>
         {[0, 1, 2].map((i) => (
-          <View key={i} style={{ width: 3, height: 3, backgroundColor: Colors.teal600, borderRadius: 1 }} />
+          <View
+            key={i}
+            style={{
+              width: 3,
+              height: 3,
+              backgroundColor: Colors.teal600,
+              borderRadius: 1,
+            }}
+          />
         ))}
       </View>
     </View>
@@ -59,16 +102,52 @@ function CalendarIcon() {
 
 function MapFoldIcon() {
   return (
-    <View style={{ width: 20, height: 18, borderWidth: 1.8, borderColor: Colors.teal600, borderRadius: 3 }}>
-      <View style={{ position: "absolute", top: 0, bottom: 0, left: 7, width: 1.5, backgroundColor: Colors.teal600 }} />
+    <View
+      style={{
+        width: 20,
+        height: 18,
+        borderWidth: 1.8,
+        borderColor: Colors.teal600,
+        borderRadius: 3,
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 7,
+          width: 1.5,
+          backgroundColor: Colors.teal600,
+        }}
+      />
     </View>
   );
 }
 
 function QuestionIcon() {
   return (
-    <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1.8, borderColor: Colors.teal600, alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: 11, color: Colors.teal600, fontWeight: "700", lineHeight: 13 }}>?</Text>
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1.8,
+        borderColor: Colors.teal600,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          color: Colors.teal600,
+          fontWeight: "700",
+          lineHeight: 13,
+        }}
+      >
+        ?
+      </Text>
     </View>
   );
 }
@@ -77,29 +156,38 @@ function QuestionIcon() {
 
 export default function AgenteHomeScreen() {
   const { user } = useAuth();
-  const agente   = user as AgenteUser;
+  const agente = user as AgenteUser;
 
   // useRouter em vez de router importado — mais estável dentro de grupos de tabs
   const router = useRouter();
 
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [refreshing, setRefreshing]     = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const stats = useMemo(() => ({
-    total:        notificacoes.length,
-    investigacao: contarStatus(notificacoes, "EM INVESTIGAÇÃO"),
-    confirmados:  contarStatus(notificacoes, "CONFIRMADO"),
-  }), [notificacoes]);
-
-  const recentes = useMemo(
-    () => [...notificacoes]
-      .sort((a, b) => new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime())
-      .slice(0, 3),
+  const stats = useMemo(
+    () => ({
+      total: notificacoes.length,
+      investigacao: contarStatus(notificacoes, "EM INVESTIGAÇÃO"),
+      confirmados: contarStatus(notificacoes, "CONFIRMADO"),
+    }),
     [notificacoes],
   );
 
-  const pendentes = notificacoes.filter((n) => n.status === "EM ANDAMENTO").length;
+  const recentes = useMemo(
+    () =>
+      [...notificacoes]
+        .sort(
+          (a, b) =>
+            new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime(),
+        )
+        .slice(0, 3),
+    [notificacoes],
+  );
+
+  const pendentes = notificacoes.filter(
+    (n) => n.status === "EM ANDAMENTO",
+  ).length;
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
@@ -107,14 +195,21 @@ export default function AgenteHomeScreen() {
       const data = await listarNotificacoes();
       setNotificacoes(data);
     } catch (err) {
-      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível carregar.");
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Não foi possível carregar.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   // Dentro de um grupo de Tabs, navigate com o nome relativo da rota
   // é mais confiável do que o caminho absoluto com o grupo entre parênteses
@@ -142,7 +237,9 @@ export default function AgenteHomeScreen() {
           </View>
           {pendentes > 0 && (
             <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{pendentes > 9 ? "9+" : pendentes}</Text>
+              <Text style={styles.bellBadgeText}>
+                {pendentes > 9 ? "9+" : pendentes}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -176,9 +273,9 @@ export default function AgenteHomeScreen() {
           </View>
         ) : (
           <View style={styles.statsRow}>
-            <StatsCard value={stats.total}        label="Total notif." />
+            <StatsCard value={stats.total} label="Total notif." />
             <StatsCard value={stats.investigacao} label="Em investigação" />
-            <StatsCard value={stats.confirmados}  label="Confirmados" />
+            <StatsCard value={stats.confirmados} label="Confirmados" />
           </View>
         )}
 
@@ -231,7 +328,9 @@ export default function AgenteHomeScreen() {
             <View style={styles.feedCenter}>
               <Text style={styles.feedEmpty}>
                 Nenhuma notificação ainda.{"\n"}
-                Toque em <Text style={{ fontWeight: "700" }}>Nova Notificação</Text> para começar.
+                Toque em{" "}
+                <Text style={{ fontWeight: "700" }}>Nova Notificação</Text> para
+                começar.
               </Text>
             </View>
           ) : (
@@ -263,30 +362,126 @@ export default function AgenteHomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
-  topbar: { backgroundColor: Colors.teal600, paddingTop: 52, paddingBottom: Spacing.md, paddingHorizontal: Spacing.lg, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  appLabel:    { fontSize: FontSize.xs, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
-  topbarTitle: { fontSize: FontSize.lg, fontWeight: "700", color: Colors.white, letterSpacing: -0.3 },
-  bellBtn:     { padding: Spacing.sm, position: "relative" },
-  bellIcon:    { width: 22, height: 22, alignItems: "center", justifyContent: "center" },
-  bellTop:     { width: 14, height: 12, borderTopLeftRadius: 7, borderTopRightRadius: 7, borderWidth: 2, borderColor: Colors.white, borderBottomWidth: 0 },
-  bellBottom:  { width: 18, height: 2, backgroundColor: Colors.white, borderRadius: 1 },
-  bellClapper: { width: 5, height: 4, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, borderWidth: 2, borderColor: Colors.white, borderTopWidth: 0, marginTop: 1 },
-  bellBadge:   { position: "absolute", top: 2, right: 2, backgroundColor: Colors.red400, borderRadius: 9, minWidth: 17, height: 17, alignItems: "center", justifyContent: "center", paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.teal600 },
+  topbar: {
+    backgroundColor: Colors.teal600,
+    paddingTop: 52,
+    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+  appLabel: {
+    fontSize: FontSize.xs,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+  topbarTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.white,
+    letterSpacing: -0.3,
+  },
+  bellBtn: { padding: Spacing.sm, position: "relative" },
+  bellIcon: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bellTop: {
+    width: 14,
+    height: 12,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    borderBottomWidth: 0,
+  },
+  bellBottom: {
+    width: 18,
+    height: 2,
+    backgroundColor: Colors.white,
+    borderRadius: 1,
+  },
+  bellClapper: {
+    width: 5,
+    height: 4,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    borderTopWidth: 0,
+    marginTop: 1,
+  },
+  bellBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: Colors.red400,
+    borderRadius: 9,
+    minWidth: 17,
+    height: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: Colors.teal600,
+  },
   bellBadgeText: { fontSize: 9, color: Colors.white, fontWeight: "700" },
-  scroll:  { flex: 1 },
+  scroll: { flex: 1 },
   content: { padding: Spacing.lg },
   greetingBlock: { marginBottom: Spacing.lg, gap: 2 },
-  greetingSub:   { fontSize: FontSize.base, color: Colors.gray400 },
-  greetingName:  { fontSize: FontSize.xl, fontWeight: "700", color: Colors.gray900, letterSpacing: -0.4 },
-  statsRow:   { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
-  loadingRow: { height: 70, alignItems: "center", justifyContent: "center", marginBottom: Spacing.lg },
+  greetingSub: { fontSize: FontSize.base, color: Colors.gray400 },
+  greetingName: {
+    fontSize: FontSize.xl,
+    fontWeight: "700",
+    color: Colors.gray900,
+    letterSpacing: -0.4,
+  },
+  statsRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
+  loadingRow: {
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
   primaryBtn: { marginBottom: Spacing.sm },
-  gridRow:    { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm },
-  gridItem:   { flex: 1 },
-  sectionLabel: { fontSize: FontSize.xs, fontWeight: "700", color: Colors.gray400, textTransform: "uppercase", letterSpacing: 0.6, marginTop: Spacing.lg, marginBottom: Spacing.md },
-  feedCard:   { backgroundColor: Colors.white, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, borderWidth: 1, borderColor: "rgba(15,110,86,0.08)", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  gridRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm },
+  gridItem: { flex: 1 },
+  sectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  feedCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
   feedCenter: { paddingVertical: Spacing.xxl, alignItems: "center" },
-  feedEmpty:  { fontSize: FontSize.sm, color: Colors.gray400, textAlign: "center", lineHeight: 20 },
-  verTodasBtn:  { alignItems: "center", paddingVertical: Spacing.md },
-  verTodasText: { fontSize: FontSize.sm, color: Colors.teal600, fontWeight: "600" },
+  feedEmpty: {
+    fontSize: FontSize.sm,
+    color: Colors.gray400,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  verTodasBtn: { alignItems: "center", paddingVertical: Spacing.md },
+  verTodasText: {
+    fontSize: FontSize.sm,
+    color: Colors.teal600,
+    fontWeight: "600",
+  },
 });

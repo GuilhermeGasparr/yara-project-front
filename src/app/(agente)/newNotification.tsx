@@ -5,13 +5,14 @@ import { Step4Anexos } from "@/components/newNotification/Step4Attachments";
 import { Step5Revisao } from "@/components/newNotification/Step5Revision";
 import { Step6Sucesso } from "@/components/newNotification/Step6Sucess";
 import { WizardHeader } from "@/components/newNotification/WizardHeader";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   WIZARD_INITIAL,
   WizardData,
 } from "@/components/newNotification/constants";
 import { Colors, Spacing } from "@/constants/theme";
 import { criarNotificacao } from "@/services/NotificationService";
-import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 
 const TOTAL_STEPS = 5; // passo 6 (sucesso) não conta na barra
@@ -30,6 +31,14 @@ export default function NewNotificationScreen() {
   const [sending, setSending] = useState(false);
   const [notificacaoId, setNotificacaoId] = useState<number | null>(null);
 
+  useFocusEffect(
+    useCallback(() => {
+      setStep(1);
+      setData(WIZARD_INITIAL);
+      setSending(false);
+      setNotificacaoId(null);
+    }, []),
+  );
   // ─── Atualização parcial do wizard ──────────────────────────────────────────
 
   function update(partial: Partial<WizardData>) {
@@ -57,7 +66,6 @@ export default function NewNotificationScreen() {
       );
       return;
     }
-
     setSending(true);
     try {
       const nome = `${data.categoria} — ${data.tipo_evento} (${new Date().toLocaleDateString("pt-BR")})`;

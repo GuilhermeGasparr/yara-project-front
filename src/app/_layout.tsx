@@ -21,7 +21,7 @@ function Guard() {
       router.replace("/(agente)/");
     } else if (user?.role === "ubs" && !inUbs) {
       // @ts-ignore
-      router.replace("/(ubs)/");
+      router.replace("/(ubs)");
     }
   }, [user, isLoading, segments]);
 
