@@ -155,6 +155,7 @@ export default function AgenteLayout() {
 
       {/* Rotas que existem no filesystem mas não aparecem na tab bar */}
       <Tabs.Screen name="map" options={{ href: null }} />
+      <Tabs.Screen name = "WebMap" options={{href: null}}/>
     </Tabs>
   );
 }

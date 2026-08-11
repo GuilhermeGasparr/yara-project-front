@@ -92,33 +92,24 @@ export const MEIOS_IDENTIFICACAO = [
 
 export const CONTINUIDADE_OPTIONS = ["Sim", "Não", "Não sei"];
 
-// ─── Dados do wizard ─────────────────────────────────────────────────────────
-
 export interface WizardData {
-  // Passo 1
   categoria: Categoria | null;
-  // Passo 2
   tipo_evento: string;
   data_aproximada: string;
   pessoas_animais: string;
   local_ocorrencia: string;
+  estado: string;
+  municipio: string;
+  endereco: string;
+  latitude?: number;
+  longitude?: number;
   meio_identificacao: string;
   continuidade_situacao: string;
-  // Passo 3
   descricao: string;
   transcricao: string;
-  // Passo 4
   medias: MediaAnexo[];
-  // Meta
-  nome: string;          // gerado automaticamente
+  nome: string;
   rascunho: boolean;
-}
-
-export interface MediaAnexo {
-  uri: string;
-  name: string;
-  type: string;
-  thumb?: string;
 }
 
 export const WIZARD_INITIAL: WizardData = {
@@ -127,6 +118,11 @@ export const WIZARD_INITIAL: WizardData = {
   data_aproximada: "",
   pessoas_animais: "",
   local_ocorrencia: "",
+  endereco: "",
+  latitude: undefined,
+  estado: "",
+  municipio: "",
+  longitude: undefined,
   meio_identificacao: "",
   continuidade_situacao: "Não sei",
   descricao: "",
@@ -135,3 +131,227 @@ export const WIZARD_INITIAL: WizardData = {
   nome: "",
   rascunho: false,
 };
+
+export interface MediaAnexo {
+  uri: string;
+  name: string;
+  type: string;
+  thumb?: string;
+}
+
+export const ESTADOS_BRASIL = [
+  "Acre",
+  "Alagoas",
+  "Amapá",
+  "Amazonas",
+  "Bahia",
+  "Ceará",
+  "Distrito Federal",
+  "Espírito Santo",
+  "Goiás",
+  "Maranhão",
+  "Mato Grosso",
+  "Mato Grosso do Sul",
+  "Minas Gerais",
+  "Pará",
+  "Paraíba",
+  "Paraná",
+  "Pernambuco",
+  "Piauí",
+  "Rio de Janeiro",
+  "Rio Grande do Norte",
+  "Rio Grande do Sul",
+  "Rondônia",
+  "Roraima",
+  "Santa Catarina",
+  "São Paulo",
+  "Sergipe",
+  "Tocantins",
+];
+
+export const MUNICIPIOS_CEARA = [
+  "Abaiara",
+  "Acarape",
+  "Acaraú",
+  "Acopiara",
+  "Aiuaba",
+  "Alcântaras",
+  "Altaneira",
+  "Alto Santo",
+  "Amontada",
+  "Antonina do Norte",
+  "Apuiarés",
+  "Aquiraz",
+  "Aracati",
+  "Aracoiaba",
+  "Ararendá",
+  "Araripe",
+  "Aratuba",
+  "Arneiroz",
+  "Assaré",
+  "Aurora",
+  "Baixio",
+  "Banabuiú",
+  "Barbalha",
+  "Barreira",
+  "Barro",
+  "Barroquinha",
+  "Baturité",
+  "Beberibe",
+  "Bela Cruz",
+  "Boa Viagem",
+  "Brejo Santo",
+  "Camocim",
+  "Campos Sales",
+  "Canindé",
+  "Capistrano",
+  "Caridade",
+  "Cariré",
+  "Caririaçu",
+  "Cariús",
+  "Carnaubal",
+  "Cascavel",
+  "Catarina",
+  "Catunda",
+  "Caucaia",
+  "Cedro",
+  "Chaval",
+  "Choró",
+  "Chorozinho",
+  "Coreaú",
+  "Crateús",
+  "Crato",
+  "Croatá",
+  "Cruz",
+  "Deputado Irapuan Pinheiro",
+  "Ereré",
+  "Eusébio",
+  "Farias Brito",
+  "Forquilha",
+  "Fortaleza",
+  "Fortim",
+  "Frecheirinha",
+  "General Sampaio",
+  "Graça",
+  "Granja",
+  "Granjeiro",
+  "Groaíras",
+  "Guaiúba",
+  "Guaraciaba do Norte",
+  "Guaramiranga",
+  "Hidrolândia",
+  "Horizonte",
+  "Ibaretama",
+  "Ibiapina",
+  "Ibicuitinga",
+  "Icapuí",
+  "Icó",
+  "Iguatu",
+  "Independência",
+  "Ipaporanga",
+  "Ipaumirim",
+  "Ipu",
+  "Ipueiras",
+  "Iracema",
+  "Irauçuba",
+  "Itaiçaba",
+  "Itaitinga",
+  "Itapajé",
+  "Itapipoca",
+  "Itapiúna",
+  "Itarema",
+  "Itatira",
+  "Jaguaretama",
+  "Jaguaribara",
+  "Jaguaribe",
+  "Jaguaruana",
+  "Jardim",
+  "Jati",
+  "Jijoca de Jericoacoara",
+  "Juazeiro do Norte",
+  "Jucás",
+  "Lavras da Mangabeira",
+  "Limoeiro do Norte",
+  "Madalena",
+  "Maracanaú",
+  "Maranguape",
+  "Marco",
+  "Martinópole",
+  "Massapê",
+  "Mauriti",
+  "Meruoca",
+  "Milagres",
+  "Milhã",
+  "Miraíma",
+  "Missão Velha",
+  "Mombaça",
+  "Monsenhor Tabosa",
+  "Morada Nova",
+  "Moraújo",
+  "Morrinhos",
+  "Mucambo",
+  "Mulungu",
+  "Nova Olinda",
+  "Nova Russas",
+  "Novo Oriente",
+  "Ocara",
+  "Orós",
+  "Pacajus",
+  "Pacatuba",
+  "Pacoti",
+  "Pacujá",
+  "Palhano",
+  "Palmácia",
+  "Paracuru",
+  "Paraipaba",
+  "Parambu",
+  "Paramoti",
+  "Pedra Branca",
+  "Penaforte",
+  "Pentecoste",
+  "Pereiro",
+  "Pindoretama",
+  "Piquet Carneiro",
+  "Pires Ferreira",
+  "Poranga",
+  "Porteiras",
+  "Potengi",
+  "Potiretama",
+  "Quiterianópolis",
+  "Quixadá",
+  "Quixelô",
+  "Quixeramobim",
+  "Quixeré",
+  "Redenção",
+  "Reriutaba",
+  "Russas",
+  "Saboeiro",
+  "Salitre",
+  "Santa Quitéria",
+  "Santana do Acaraú",
+  "Santana do Cariri",
+  "São Benedito",
+  "São Gonçalo do Amarante",
+  "São João do Jaguaribe",
+  "São Luís do Curu",
+  "Senador Pompeu",
+  "Senador Sá",
+  "Sobral",
+  "Solonópole",
+  "Tabuleiro do Norte",
+  "Tamboril",
+  "Tarrafas",
+  "Tauá",
+  "Tejuçuoca",
+  "Tianguá",
+  "Trairi",
+  "Tururu",
+  "Ubajara",
+  "Umari",
+  "Umirim",
+  "Uruburetama",
+  "Uruoca",
+  "Varjota",
+  "Várzea Alegre",
+  "Viçosa do Ceará",
+];

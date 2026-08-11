@@ -79,6 +79,11 @@ export default function NewNotificationScreen() {
           10,
         ),
         local_ocorrencia: data.local_ocorrencia,
+
+        endereco: data.endereco,
+        estado: data.estado,
+        municipio: data.municipio,
+
         continuidade_situacao: data.continuidade_situacao,
         descricao: data.descricao || data.transcricao || "Sem descrição.",
         status: "EM ANDAMENTO",
