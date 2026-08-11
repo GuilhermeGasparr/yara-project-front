@@ -301,7 +301,7 @@ export default function AgenteHomeScreen() {
             label="Mapa"
             sublabel="Território"
             icon={<MapFoldIcon />}
-            onPress={() => goTo("map")}
+            onPress={() => router.navigate("/(agente)/map")}
             style={styles.gridItem}
           />
         </View>

@@ -4,8 +4,10 @@ import { PickerField, SegmentedPicker, TextField } from "./FormField";
 import { WizardNavButtons } from "./WizardNavButtons";
 import {
   CONTINUIDADE_OPTIONS,
+  ESTADOS_BRASIL,
   LOCAIS_OCORRENCIA,
   MEIOS_IDENTIFICACAO,
+  MUNICIPIOS_CEARA,
   TIPOS_POR_CATEGORIA,
   WizardData,
 } from "./constants";
@@ -27,7 +29,15 @@ export function Step2Detalhes({ data, onChange, onNext, onBack }: Props) {
       : "Nº estimado de pessoas afetadas";
 
   function handleNext() {
-    if (!data.tipo_evento || !data.local_ocorrencia) return;
+    if (
+      !data.tipo_evento ||
+      !data.local_ocorrencia ||
+      !data.estado ||
+      !data.municipio
+    ) {
+      return;
+    }
+
     onNext();
   }
 
@@ -44,7 +54,36 @@ export function Step2Detalhes({ data, onChange, onNext, onBack }: Props) {
         placeholder="Selecione o tipo..."
         error={!data.tipo_evento ? "" : undefined}
       />
+      <TextField
+        label="Endereço da ocorrência (Ex: Rua das Flores, 45)"
+        value={data.endereco}
+        onChangeText={(v) => onChange({ endereco: v })}
+        placeholder="Rua, número, bairro..."
+      />
+      <PickerField
+        label="Estado"
+        options={ESTADOS_BRASIL}
+        value={data.estado}
+        onSelect={(v) =>
+          onChange({
+            estado: v,
+            municipio: "",
+          })
+        }
+        placeholder="Selecione o estado..."
+      />
 
+      <PickerField
+        label="Município"
+        options={data.estado === "Ceará" ? MUNICIPIOS_CEARA : []}
+        value={data.municipio}
+        onSelect={(v) => onChange({ municipio: v })}
+        placeholder={
+          data.estado === "Ceará"
+            ? "Selecione o município..."
+            : "Selecione primeiro o Ceará..."
+        }
+      />
       <TextField
         label="Data aproximada"
         value={data.data_aproximada}

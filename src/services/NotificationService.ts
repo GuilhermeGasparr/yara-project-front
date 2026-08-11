@@ -1,18 +1,18 @@
-import { getItem } from '@/utils/storage';
-import { Platform } from 'react-native';
-const BASE_URL = 'http://localhost:8000';
+import { getItem } from "@/utils/storage";
+import { Platform } from "react-native";
+const BASE_URL = "http://localhost:8000";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type NotificacaoStatus =
-  | 'EM ANDAMENTO'
-  | 'RECEBIDO'
-  | 'EM INVESTIGAÇÃO'
-  | 'CONFIRMADO'
-  | 'DESCARTADO'
-  | 'ENCERRADO';
+  | "EM ANDAMENTO"
+  | "RECEBIDO"
+  | "EM INVESTIGAÇÃO"
+  | "CONFIRMADO"
+  | "DESCARTADO"
+  | "ENCERRADO";
 
-export type Categoria = 'DOENÇA' | 'EPIZOOTIA' | 'DESASTRE';
+export type Categoria = "DOENÇA" | "EPIZOOTIA" | "DESASTRE";
 
 export interface Notificacao {
   id: number;
@@ -22,6 +22,9 @@ export interface Notificacao {
   data_envio: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
+  endereco?: string; // <--- ADICIONADO
+  latitude?: number; // <--- ADICIONADO
+  longitude?: number; // <--- ADICIONADO
   continuidade_situacao: string;
   descricao: string;
   acs_ace_id: number;
@@ -35,6 +38,11 @@ export interface CriarNotificacaoPayload {
   categoria: Categoria;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
+  endereco?: string;
+  estado?: string;
+  municipio?: string;
+  latitude?: number;
+  longitude?: number;
   continuidade_situacao: string;
   descricao: string;
   status: NotificacaoStatus;
@@ -45,8 +53,8 @@ export interface CriarNotificacaoPayload {
 // ─── Helper para obter o token armazenado ─────────────────────────────────────
 
 async function authHeader(): Promise<Record<string, string>> {
-  const token = await getItem('sentinela_token');
-  if (!token) throw new Error('Não autenticado.');
+  const token = await getItem("sentinela_token");
+  if (!token) throw new Error("Não autenticado.");
   return { Authorization: `Bearer ${token}` };
 }
 
@@ -56,13 +64,15 @@ async function authHeader(): Promise<Record<string, string>> {
 export async function listarNotificacoes(): Promise<Notificacao[]> {
   const headers = await authHeader();
 
-  const res = await fetch(`${BASE_URL}/agentes/listar_notificacoes`, { headers });
+  const res = await fetch(`${BASE_URL}/agentes/listar_notificacoes`, {
+    headers,
+  });
   const data = await res.json();
 
-  if (!res.ok) throw new Error(data.detail ?? 'Erro ao carregar notificações.');
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao carregar notificações.");
 
   // O backend retorna { "Notificações": [...] }
-  return data['Notificações'] as Notificacao[];
+  return data["Notificações"] as Notificacao[];
 }
 
 // ─── Criar notificação ────────────────────────────────────────────────────────
@@ -85,6 +95,24 @@ export async function criarNotificacao(
   );
 
   form.append("local_ocorrencia", payload.local_ocorrencia);
+
+  // Novos campos enviados ao FormData
+  if (payload.endereco) {
+    form.append("endereco", payload.endereco);
+  }
+  if (payload.estado) {
+    form.append("estado", payload.estado);
+  }
+  if (payload.municipio) {
+    form.append("municipio", payload.municipio);
+  }
+  if (payload.latitude !== undefined && payload.latitude !== null) {
+    form.append("latitude", String(payload.latitude));
+  }
+  if (payload.longitude !== undefined && payload.longitude !== null) {
+    form.append("longitude", String(payload.longitude));
+  }
+
   form.append("continuidade_situacao", payload.continuidade_situacao);
   form.append("descricao", payload.descricao);
   form.append("status", payload.status);
@@ -105,14 +133,11 @@ export async function criarNotificacao(
     }
   }
 
-  const res = await fetch(
-    `${BASE_URL}/agentes/criar_notificacao`,
-    {
-      method: "POST",
-      headers,
-      body: form,
-    },
-  );
+  const res = await fetch(`${BASE_URL}/agentes/criar_notificacao`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
 
   const data = await res.json();
 
