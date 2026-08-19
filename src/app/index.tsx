@@ -19,7 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 // ─── Ícone SVG inline — círculo + ponteiro de relógio (logo sentinela) ───────
 function SentinelaLogo() {
   return (
@@ -33,22 +32,27 @@ function SentinelaLogo() {
   );
 }
 
-// ─── Componente Segmented Control Moderno (RoleSelector) ─────────────────────
 interface RoleSelectorProps {
-  selectedRole: "ACS/ACE" | "UBS" | "";
-  onChangeRole: (role: "ACS/ACE" | "UBS") => void;
+  selectedRole: "ACS/ACE" | "UBS" | "CM" | "";
+  onChangeRole: (role: "ACS/ACE" | "UBS" | "CM") => void;
   hasError?: boolean;
 }
 
-function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProps) {
+function RoleSelector({
+  selectedRole,
+  onChangeRole,
+  hasError,
+}: RoleSelectorProps) {
   const [containerWidth, setContainerWidth] = useState(0);
-  
+
   // Referências de animação
   const sliderAnim = useRef(new Animated.Value(0)).current;
   const scaleACS = useRef(new Animated.Value(1)).current;
   const scaleUBS = useRef(new Animated.Value(1)).current;
+  const scaleCM = useRef(new Animated.Value(1)).current;
   const fadeACS = useRef(new Animated.Value(0.6)).current;
   const fadeUBS = useRef(new Animated.Value(0.6)).current;
+  const fadeCM = useRef(new Animated.Value(0.6)).current;
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
@@ -58,7 +62,16 @@ function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProp
     if (containerWidth === 0) return;
 
     // Se não houver nada selecionado (""), deixa o indicador escondido ou na esquerda invisível
-    const targetValue = selectedRole === "UBS" ? containerWidth / 2 : 0;
+    const optionWidth = containerWidth / 3;
+
+    const targetValue =
+      selectedRole === "ACS/ACE"
+        ? 0
+        : selectedRole === "UBS"
+          ? optionWidth
+          : selectedRole === "CM"
+            ? optionWidth * 2
+            : 0;
 
     Animated.spring(sliderAnim, {
       toValue: targetValue,
@@ -78,34 +91,49 @@ function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProp
       duration: 200,
       useNativeDriver: true,
     }).start();
+
+    Animated.timing(fadeCM, {
+      toValue: selectedRole === "CM" ? 1 : 0.6,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
   }, [selectedRole, containerWidth]);
 
-  const onPressIn = (role: "ACS/ACE" | "UBS") => {
-    Animated.timing(role === "ACS/ACE" ? scaleACS : scaleUBS, {
+  const onPressIn = (role: "ACS/ACE" | "UBS" | "CM") => {
+    const scale =
+      role === "ACS/ACE" ? scaleACS : role === "UBS" ? scaleUBS : scaleCM;
+
+    Animated.timing(scale, {
       toValue: 0.95,
       duration: 100,
       useNativeDriver: true,
     }).start();
   };
 
-  const onPressOut = (role: "ACS/ACE" | "UBS") => {
-    Animated.timing(role === "ACS/ACE" ? scaleACS : scaleUBS, {
+  const onPressOut = (role: "ACS/ACE" | "UBS" | "CM") => {
+    const scale =
+      role === "ACS/ACE" ? scaleACS : role === "UBS" ? scaleUBS : scaleCM;
+
+    Animated.timing(scale, {
       toValue: 1,
       duration: 100,
       useNativeDriver: true,
     }).start();
   };
 
-  const sliderWidth = containerWidth ? containerWidth / 2 - 4 : 0;
-  // O indicador só aparece se houver uma opção de fato selecionada
-  const showIndicator = selectedRole === "ACS/ACE" || selectedRole === "UBS";
+  const sliderWidth = containerWidth ? containerWidth / 3 - 4 : 0;
+
+  const showIndicator =
+    selectedRole === "ACS/ACE" ||
+    selectedRole === "UBS" ||
+    selectedRole === "CM";
 
   return (
-    <View 
+    <View
       style={[
-        styles.selectorContainer, 
-        hasError && styles.selectorContainerError
-      ]} 
+        styles.selectorContainer,
+        hasError && styles.selectorContainerError,
+      ]}
       onLayout={handleLayout}
     >
       {containerWidth > 0 && showIndicator && (
@@ -128,13 +156,23 @@ function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProp
         accessibilityRole="tab"
         accessibilityState={{ selected: selectedRole === "ACS/ACE" }}
       >
-        <Animated.View style={[styles.optionContent, { transform: [{ scale: scaleACS }], opacity: fadeACS }]}>
+        <Animated.View
+          style={[
+            styles.optionContent,
+            { transform: [{ scale: scaleACS }], opacity: fadeACS },
+          ]}
+        >
           <Feather
             name="users"
             size={16}
             color={selectedRole === "ACS/ACE" ? Colors.teal600 : Colors.gray400}
           />
-          <Text style={[styles.selectorText, selectedRole === "ACS/ACE" && styles.selectorTextActive]}>
+          <Text
+            style={[
+              styles.selectorText,
+              selectedRole === "ACS/ACE" && styles.selectorTextActive,
+            ]}
+          >
             ACS / ACE
           </Text>
         </Animated.View>
@@ -148,14 +186,58 @@ function RoleSelector({ selectedRole, onChangeRole, hasError }: RoleSelectorProp
         accessibilityRole="tab"
         accessibilityState={{ selected: selectedRole === "UBS" }}
       >
-        <Animated.View style={[styles.optionContent, { transform: [{ scale: scaleUBS }], opacity: fadeUBS }]}>
+        <Animated.View
+          style={[
+            styles.optionContent,
+            { transform: [{ scale: scaleUBS }], opacity: fadeUBS },
+          ]}
+        >
           <Feather
             name="home"
             size={16}
             color={selectedRole === "UBS" ? Colors.teal600 : Colors.gray400}
           />
-          <Text style={[styles.selectorText, selectedRole === "UBS" && styles.selectorTextActive]}>
+          <Text
+            style={[
+              styles.selectorText,
+              selectedRole === "UBS" && styles.selectorTextActive,
+            ]}
+          >
             Equipe UBS
+          </Text>
+        </Animated.View>
+      </Pressable>
+
+      <Pressable
+        onPressIn={() => onPressIn("CM")}
+        onPressOut={() => onPressOut("CM")}
+        onPress={() => onChangeRole("CM")}
+        style={styles.selectorOption}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: selectedRole === "CM" }}
+      >
+        <Animated.View
+          style={[
+            styles.optionContent,
+            {
+              transform: [{ scale: scaleCM }],
+              opacity: fadeCM,
+            },
+          ]}
+        >
+          <Feather
+            name="briefcase"
+            size={16}
+            color={selectedRole === "CM" ? Colors.teal600 : Colors.gray400}
+          />
+
+          <Text
+            style={[
+              styles.selectorText,
+              selectedRole === "CM" && styles.selectorTextActive,
+            ]}
+          >
+            Coord. Municipal
           </Text>
         </Animated.View>
       </Pressable>
@@ -234,10 +316,10 @@ function Field({
             style={styles.eyeBtn}
             hitSlop={8}
           >
-            <Feather 
-              name={showPassword ? "eye-off" : "eye"} 
-              size={18} 
-              color={Colors.gray400} 
+            <Feather
+              name={showPassword ? "eye-off" : "eye"}
+              size={18}
+              color={Colors.gray400}
             />
           </Pressable>
         )}
@@ -266,48 +348,67 @@ export default function LoginScreen() {
 
   function shake() {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, {
+        toValue: 8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 6,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -6,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 60,
+        useNativeDriver: true,
+      }),
     ]).start();
   }
 
   async function handleSubmit() {
     setApiError(null);
-    const valid = validateAll();
-    if (!valid) {
+
+    if (!validateAll()) {
       shake();
       return;
     }
 
     setLoading(true);
+
     try {
       await signIn({
         email: form.email.trim().toLowerCase(),
         senha: form.senha,
         tipo_login: form.tipo_login,
-      } as any);
+      });
 
-      if(form.tipo_login == "ACS/ACE") {
+      if (form.tipo_login === "ACS/ACE") {
         router.replace("/(agente)");
-      } else if(form.tipo_login == "UBS") {
+      } else if (form.tipo_login === "UBS") {
         router.replace("/(ubs)");
+      } else if (form.tipo_login === "CM") {
+        router.replace("/(cm)");
       }
-      
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Erro inesperado. Tente novamente.";
+      const msg = err instanceof Error ? err.message : "Erro ao autenticar.";
+
       setApiError(msg);
       shake();
     } finally {
       setLoading(false);
     }
   }
-
   const hasTipoError = touched.tipo_login && !!errors.tipo;
 
   return (
@@ -346,15 +447,20 @@ export default function LoginScreen() {
 
             {/* Label do Seletor */}
             <Text style={styles.fieldLabel}>Tipo de Usuário</Text>
-            
+
             {/* Seletor conectado diretamente ao hook useLoginForm */}
-            <RoleSelector 
-              selectedRole={form.tipo_login} 
+            <RoleSelector
+              selectedRole={form.tipo_login}
               onChangeRole={(value) => handleChange("tipo_login", value)}
               hasError={hasTipoError}
             />
             {hasTipoError && (
-              <View style={[styles.errorRow, { marginTop: -Spacing.md, marginBottom: Spacing.md }]}>
+              <View
+                style={[
+                  styles.errorRow,
+                  { marginTop: -Spacing.md, marginBottom: Spacing.md },
+                ]}
+              >
                 <Feather name="alert-circle" size={14} color={Colors.red400} />
                 <Text style={styles.errorText}>{errors.tipo}</Text>
               </View>
@@ -390,7 +496,12 @@ export default function LoginScreen() {
             {/* Erro da API */}
             {apiError && (
               <View style={styles.apiErrorBox}>
-                <Feather name="x-circle" size={16} color={Colors.red600} style={{ marginTop: 2 }} />
+                <Feather
+                  name="x-circle"
+                  size={16}
+                  color={Colors.red600}
+                  style={{ marginTop: 2 }}
+                />
                 <Text style={styles.apiErrorText}>{apiError}</Text>
               </View>
             )}

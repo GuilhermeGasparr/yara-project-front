@@ -8,9 +8,10 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+
 import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { AgenteUser } from "@/types";
+import { CMUser } from "@/types";
 
 function getInitials(nome: string): string {
   return nome
@@ -21,7 +22,13 @@ function getInitials(nome: string): string {
     .join("");
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -32,7 +39,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const agente = user as AgenteUser;
+
+  const cm = user as CMUser;
 
   async function doLogout() {
     await signOut();
@@ -46,13 +54,28 @@ export default function ProfileScreen() {
 
   function handleSignOut() {
     if (Platform.OS === "web") {
-      if (confirm("Tem certeza que deseja encerrar a sessão?")) doLogout();
+      if (confirm("Tem certeza que deseja encerrar a sessão?")) {
+        doLogout();
+      }
+
       return;
     }
-    Alert.alert("Sair da conta", "Tem certeza que deseja encerrar a sessão?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Sair", style: "destructive", onPress: doLogout },
-    ]);
+
+    Alert.alert(
+      "Sair da conta",
+      "Tem certeza que deseja encerrar a sessão?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: doLogout,
+        },
+      ]
+    );
   }
 
   return (
@@ -61,14 +84,21 @@ export default function ProfileScreen() {
         <View style={styles.topbar}>
           <Text style={styles.topbarTitle}>Perfil</Text>
         </View>
+
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {agente?.nome ? getInitials(agente.nome) : "AG"}
+              {cm?.nome ? getInitials(cm.nome) : "CM"}
             </Text>
           </View>
-          <Text style={styles.name}>{agente?.nome ?? "Agente"}</Text>
-          <Text style={styles.cargo}>{agente?.cargo ?? "ACS"}</Text>
+
+          <Text style={styles.name}>
+            {cm?.nome ?? "Coordenador Municipal"}
+          </Text>
+
+          <Text style={styles.cargo}>
+            {cm?.cargo ?? "Coordenador Municipal"}
+          </Text>
         </View>
       </View>
 
@@ -78,18 +108,29 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Informações da conta</Text>
-          <InfoRow label="Nome completo" value={agente?.nome ?? "—"} />
-          <InfoRow label="Cargo" value={agente?.cargo ?? "—"} />
-          <InfoRow label="E-mail" value={agente?.email ?? "—"} />
-        </View>
+          <Text style={styles.sectionLabel}>
+            Informações da conta
+          </Text>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Configurações</Text>
-          <TouchableOpacity style={styles.actionRow} activeOpacity={0.7}>
-            <Text style={styles.actionText}>Alterar senha</Text>
-            <View style={styles.chevron} />
-          </TouchableOpacity>
+          <InfoRow
+            label="Nome completo"
+            value={cm?.nome ?? "—"}
+          />
+
+          <InfoRow
+            label="Cargo"
+            value={cm?.cargo ?? "—"}
+          />
+
+          <InfoRow
+            label="E-mail"
+            value={cm?.email ?? "—"}
+          />
+
+          <InfoRow
+            label="Município"
+            value={cm?.municipio ?? "—"}
+          />
         </View>
 
         <TouchableOpacity
@@ -97,10 +138,15 @@ export default function ProfileScreen() {
           onPress={handleSignOut}
           activeOpacity={0.85}
         >
-          <Text style={styles.logoutText}>Sair da conta</Text>
+          <Text style={styles.logoutText}>
+            Sair da conta
+          </Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Sentinela Saúde · v1.0</Text>
+        <Text style={styles.version}>
+          Sentinela Saúde · v1.0
+        </Text>
+
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
     </View>
@@ -108,19 +154,34 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.bg },
-  hero: { backgroundColor: Colors.teal600, paddingBottom: Spacing.xxl },
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.bg,
+  },
+
+  hero: {
+    backgroundColor: Colors.teal600,
+    paddingBottom: Spacing.xxl,
+  },
+
   topbar: {
     paddingTop: 52,
     paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },
+
   topbarTitle: {
     fontSize: FontSize.lg,
     fontWeight: "700",
     color: Colors.white,
   },
-  avatarWrap: { alignItems: "center", paddingTop: Spacing.sm, gap: 6 },
+
+  avatarWrap: {
+    alignItems: "center",
+    paddingTop: Spacing.sm,
+    gap: 6,
+  },
+
   avatar: {
     width: 72,
     height: 72,
@@ -132,11 +193,34 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.4)",
     marginBottom: 4,
   },
-  avatarText: { fontSize: 26, fontWeight: "700", color: Colors.white },
-  name: { fontSize: FontSize.lg, fontWeight: "700", color: Colors.white },
-  cargo: { fontSize: FontSize.sm, color: "rgba(255,255,255,0.75)" },
-  scroll: { flex: 1, marginTop: -Spacing.lg },
-  content: { padding: Spacing.lg, paddingTop: Spacing.xl },
+
+  avatarText: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: Colors.white,
+  },
+
+  name: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.white,
+  },
+
+  cargo: {
+    fontSize: FontSize.sm,
+    color: "rgba(255,255,255,0.75)",
+  },
+
+  scroll: {
+    flex: 1,
+    marginTop: -Spacing.lg,
+  },
+
+  content: {
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+
   card: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
@@ -145,11 +229,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(15,110,86,0.08)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
   },
+
   sectionLabel: {
     fontSize: FontSize.xs,
     fontWeight: "700",
@@ -158,6 +246,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: Spacing.md,
   },
+
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -166,7 +255,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray50,
   },
-  infoLabel: { fontSize: FontSize.sm, color: Colors.gray400 },
+
+  infoLabel: {
+    fontSize: FontSize.sm,
+    color: Colors.gray400,
+  },
+
   infoValue: {
     fontSize: FontSize.sm,
     fontWeight: "500",
@@ -175,22 +269,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
   },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.md,
-  },
-  actionText: { fontSize: FontSize.base, color: Colors.gray900 },
-  chevron: {
-    width: 7,
-    height: 7,
-    borderRightWidth: 2,
-    borderTopWidth: 2,
-    borderColor: Colors.gray200,
-    transform: [{ rotate: "45deg" }],
-  },
-  separator: { height: 1, backgroundColor: Colors.gray50 },
+
   logoutBtn: {
     backgroundColor: Colors.red50,
     borderRadius: Radius.md,
@@ -200,11 +279,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.red400,
     marginBottom: Spacing.md,
   },
+
   logoutText: {
     fontSize: FontSize.base,
     fontWeight: "700",
     color: Colors.red600,
   },
+
   version: {
     textAlign: "center",
     fontSize: FontSize.xs,

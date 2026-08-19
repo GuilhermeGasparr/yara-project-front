@@ -25,21 +25,18 @@
     },
     "plugins": [
       "expo-router",
-
       [
         "expo-image-picker",
         {
           "photosPermission": "O app precisa acessar sua galeria para anexar imagens."
         }
       ],
-
       [
         "expo-av",
         {
           "microphonePermission": "O app precisa do microfone para gravar áudio da ocorrência."
         }
       ],
-
       [
         "expo-splash-screen",
         {
@@ -48,8 +45,8 @@
           "imageWidth": 76
         }
       ],
-
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
