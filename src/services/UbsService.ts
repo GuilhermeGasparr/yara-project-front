@@ -1,72 +1,112 @@
-import { getItem } from '@/utils/storage';
+import { getItem } from "@/utils/storage";
 
-const BASE_URL = 'http://localhost:8000'; // Substitua pelo IP da sua máquina se rodar no celular físico
+const BASE_URL = "https://confutable-marybeth-throatily.ngrok-free.dev";
+
+const BASE_HEADERS: Record<string, string> = {
+  "ngrok-skip-browser-warning": "true",
+};
 
 async function authHeader(): Promise<Record<string, string>> {
-  const token = await getItem('sentinela_token');
-  if (!token) throw new Error('Token de autenticação não encontrado.');
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+  const token = await getItem("sentinela_token");
+  if (!token) throw new Error("Não autenticado.");
+  return { ...BASE_HEADERS, Authorization: `Bearer ${token}` };
 }
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+export type NotificacaoStatus =
+  | "EM ANDAMENTO"
+  | "VALIDADA"
+  | "ENCAMINHADA"
+  | "COMPLEMENTADA"
+  | "EM INVESTIGAÇÃO"
+  | "CONFIRMADO"
+  | "DESCARTADO"
+  | "ENCERRADO";
+
+export type Categoria = "DOENÇA" | "EPIZOOTIA" | "DESASTRE";
 
 export interface NotificacaoUBS {
   id: number;
   nome: string;
   tipo_evento: string;
-  categoria: string;
+  categoria: Categoria;
   data_envio: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
+  continuidade_situacao: string;
   descricao: string;
-  status: string;
   acs_ace_id: number;
+  acs_ace_nome?: string;
+  status: NotificacaoStatus;
   rascunho: boolean;
 }
 
-export async function buscarNotificacoesUBS(): Promise<NotificacaoUBS[]> {
+// ─── GET /ubs/notificacoes ────────────────────────────────────────────────────
+
+export async function listarNotificacoesUBS(): Promise<NotificacaoUBS[]> {
   const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/ubs/notificacoes`, { method: 'GET', headers });
+  const res = await fetch(`${BASE_URL}/ubs/notificacoes`, { headers });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? 'Erro ao listar notificações.');
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao buscar notificações.");
   return data.notificacoes as NotificacaoUBS[];
 }
 
-export async function validarNotificacaoAPI(id: number): Promise<void> {
-  const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}/validar`, { method: 'PATCH', headers });
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.detail ?? 'Erro ao validar notificação.');
-  }
-}
+// ─── PATCH /ubs/notificacoes/:id/validar ──────────────────────────────────────
 
-export async function encaminharNotificacaoAPI(id: number): Promise<void> {
+export async function validarNotificacao(id: number): Promise<void> {
   const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}/encaminhar`, { method: 'PATCH', headers });
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.detail ?? 'Erro ao encaminhar notificação.');
-  }
-}
-
-export async function obterDetalhesNotificacaoAPI(id: number): Promise<any> {
-  const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}`, { method: 'GET', headers });
+  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}/validar`, {
+    method: "PATCH",
+    headers,
+  });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? 'Erro ao obter detalhes da notificação.');
-  return data;
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao validar.");
 }
 
-export async function complementarNotificacaoAPI(id: number, informacaoExtra: string): Promise<void> {
+// ─── PATCH /ubs/notificacoes/:id/encaminhar ───────────────────────────────────
+
+export async function encaminharNotificacao(id: number): Promise<void> {
   const headers = await authHeader();
-  const res = await fetch(
-    `${BASE_URL}/ubs/notificacoes/${id}/complementar?informacao_extra=${encodeURIComponent(informacaoExtra)}`,
-    { method: 'PATCH', headers }
-  );
+  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}/encaminhar`, {
+    method: "PATCH",
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao encaminhar.");
+}
+
+// ─── PATCH /ubs/notificacoes/:id/complementar ─────────────────────────────────
+
+export async function complementarNotificacao(
+  id: number,
+  informacao_extra: string
+): Promise<void> {
+  const headers = await authHeader();
+  const url = `${BASE_URL}/ubs/notificacoes/${id}/complementar?informacao_extra=${encodeURIComponent(informacao_extra)}`;
+  const res = await fetch(url, { method: "PATCH", headers });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao complementar.");
+}
+
+export interface DadosUBS {
+  id: number;
+  nome: string;
+  // adicione outros campos se existirem no seu model Dados_UBS
+}
+
+export async function buscarDadosUBS(): Promise<DadosUBS> {
+  const headers = await authHeader();
+
+  const res = await fetch(`${BASE_URL}/ubs/dados_ubs`, {
+    headers,
+  });
+
+  const data = await res.json();
+
   if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.detail ?? 'Erro ao complementar notificação.');
+    throw new Error(data.detail ?? "Erro ao buscar dados da UBS.");
   }
+
+  return data["Dados da UBS"] as DadosUBS;
 }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 interface LoginForm {
   email: string;
   senha: string;
-  tipo_login: "ACS/ACE" | "UBS" | "";
+  tipo_login: "ACS/ACE" | "UBS" | "CM" |"";
 }
 
 interface LoginErrors {

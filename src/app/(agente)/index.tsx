@@ -27,14 +27,21 @@ import {
 function getSaudacao() {
   const h = new Date().getHours();
   if (h < 12) return "Bom dia,";
-  if (h < 18) return "Boa tarde,";
-  return "Boa noite,";
+  if (h < 18) return "Boa tarde,";  return "Boa noite,";
 }
 
 function contarStatus(list: Notificacao[], status: NotificacaoStatus) {
   return list.filter((n) => n.status === status).length;
 }
 
+function getInitials(nome: string): string {
+  return nome
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0].toUpperCase())
+    .slice(0, 2)
+    .join("");
+}
 // ─── Ícones ───────────────────────────────────────────────────────────────────
 
 function PlusIcon() {
@@ -229,19 +236,17 @@ export default function AgenteHomeScreen() {
           <Text style={styles.appLabel}>Sentinela Saúde</Text>
           <Text style={styles.topbarTitle}>Início</Text>
         </View>
-        <TouchableOpacity style={styles.bellBtn} activeOpacity={0.75}>
-          <View style={styles.bellIcon}>
-            <View style={styles.bellTop} />
-            <View style={styles.bellBottom} />
-            <View style={styles.bellClapper} />
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => router.push("/(agente)/profile")}
+          activeOpacity={0.8}
+          hitSlop={8}
+        >
+          <View style={styles.profileBtnInner}>
+            <Text style={styles.profileBtnText}>
+              {user?.nome ? getInitials(user.nome) : "AG"}
+            </Text>
           </View>
-          {pendentes > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>
-                {pendentes > 9 ? "9+" : pendentes}
-              </Text>
-            </View>
-          )}
         </TouchableOpacity>
       </View>
 
@@ -382,28 +387,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
     letterSpacing: -0.3,
   },
-  bellBtn: { padding: Spacing.sm, position: "relative" },
-  bellIcon: {
-    width: 22,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bellTop: {
-    width: 14,
-    height: 12,
-    borderTopLeftRadius: 7,
-    borderTopRightRadius: 7,
-    borderWidth: 2,
-    borderColor: Colors.white,
-    borderBottomWidth: 0,
-  },
-  bellBottom: {
-    width: 18,
-    height: 2,
-    backgroundColor: Colors.white,
-    borderRadius: 1,
-  },
   bellClapper: {
     width: 5,
     height: 4,
@@ -484,4 +467,28 @@ const styles = StyleSheet.create({
     color: Colors.teal600,
     fontWeight: "600",
   },
+  profileBtn: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+profileBtnInner: {
+  width: 38,
+  height: 38,
+  borderRadius: 19,
+  backgroundColor: "rgba(255,255,255,0.2)",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 2,
+  borderColor: "rgba(255,255,255,0.4)",
+},
+
+profileBtnText: {
+  fontSize: 14,
+  fontWeight: "700",
+  color: Colors.white,
+},
 });

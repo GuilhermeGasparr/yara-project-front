@@ -10,7 +10,9 @@ import {
 import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { AgenteUser } from "@/types";
+import { UBSUser } from "@/types";
+import { buscarDadosUBS } from "@/services/UbsService";
+import { useEffect, useState } from "react";
 
 function getInitials(nome: string): string {
   return nome
@@ -30,17 +32,26 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ProfileScreen() {
+export default function UbsProfileScreen() {
   const { user, signOut } = useAuth();
-  const agente = user as AgenteUser;
+  const ubs = user as UBSUser;
+  const [nomeUBS, setNomeUBS] = useState<string>("");
 
-  async function doLogout() {
-    await signOut();
-
-    if (router.canDismiss()) {
-      router.dismissAll();
+  useEffect(() => {
+    async function carregarDadosUBS() {
+      try {
+        const dados = await buscarDadosUBS();
+        setNomeUBS(dados.nome);
+      } catch (error) {
+        console.error("Erro ao carregar dados da UBS:", error);
+      }
     }
 
+    carregarDadosUBS();
+  }, []);
+  async function doLogout() {
+    await signOut();
+    if (router.canDismiss()) router.dismissAll();
     router.replace("/");
   }
 
@@ -55,20 +66,31 @@ export default function ProfileScreen() {
     ]);
   }
 
+  const initials = ubs?.nome ? getInitials(ubs.nome) : "UBS";
+
   return (
     <View style={styles.screen}>
+      {/* Hero */}
       <View style={styles.hero}>
         <View style={styles.topbar}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            hitSlop={12}
+          >
+            <View style={styles.backArrow} />
+          </TouchableOpacity>
           <Text style={styles.topbarTitle}>Perfil</Text>
         </View>
+
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {agente?.nome ? getInitials(agente.nome) : "AG"}
-            </Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.name}>{agente?.nome ?? "Agente"}</Text>
-          <Text style={styles.cargo}>{agente?.cargo ?? "ACS"}</Text>
+          <Text style={styles.name}>{ubs?.nome ?? "Unidade de Saúde"}</Text>
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>Equipe UBS</Text>
+          </View>
         </View>
       </View>
 
@@ -77,13 +99,15 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Informações da unidade */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Informações da conta</Text>
-          <InfoRow label="Nome completo" value={agente?.nome ?? "—"} />
-          <InfoRow label="Cargo" value={agente?.cargo ?? "—"} />
-          <InfoRow label="E-mail" value={agente?.email ?? "—"} />
+          <Text style={styles.sectionLabel}>Informações da unidade</Text>
+          <InfoRow label="Unidade" value={nomeUBS || "—"} />
+          <InfoRow label="Município" value={ubs?.municipio ?? "—"} />
+          <InfoRow label="E-mail" value={ubs?.email ?? "—"} />
         </View>
 
+        {/* Configurações */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Configurações</Text>
           <TouchableOpacity style={styles.actionRow} activeOpacity={0.7}>
@@ -92,6 +116,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Logout */}
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleSignOut}
@@ -109,18 +134,40 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
+
+  // Hero
   hero: { backgroundColor: Colors.teal600, paddingBottom: Spacing.xxl },
   topbar: {
     paddingTop: 52,
     paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backArrow: {
+    width: 9,
+    height: 9,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: Colors.white,
+    transform: [{ rotate: "45deg" }, { translateX: 2 }],
   },
   topbarTitle: {
     fontSize: FontSize.lg,
     fontWeight: "700",
     color: Colors.white,
   },
-  avatarWrap: { alignItems: "center", paddingTop: Spacing.sm, gap: 6 },
+
+  avatarWrap: { alignItems: "center", paddingTop: Spacing.sm, gap: 8 },
   avatar: {
     width: 72,
     height: 72,
@@ -132,11 +179,31 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.4)",
     marginBottom: 4,
   },
-  avatarText: { fontSize: 26, fontWeight: "700", color: Colors.white },
-  name: { fontSize: FontSize.lg, fontWeight: "700", color: Colors.white },
-  cargo: { fontSize: FontSize.sm, color: "rgba(255,255,255,0.75)" },
+  avatarText: { fontSize: 22, fontWeight: "700", color: Colors.white },
+  name: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.white,
+    textAlign: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  roleBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  roleBadgeText: {
+    fontSize: FontSize.xs,
+    color: Colors.white,
+    fontWeight: "600",
+  },
+
+  // Scroll
   scroll: { flex: 1, marginTop: -Spacing.lg },
   content: { padding: Spacing.lg, paddingTop: Spacing.xl },
+
+  // Card
   card: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
@@ -158,6 +225,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: Spacing.md,
   },
+
+  // Info rows
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -175,6 +244,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
   },
+
+  // Action rows
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -191,6 +262,8 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
   },
   separator: { height: 1, backgroundColor: Colors.gray50 },
+
+  // Logout
   logoutBtn: {
     backgroundColor: Colors.red50,
     borderRadius: Radius.md,
@@ -205,6 +278,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.red600,
   },
+
   version: {
     textAlign: "center",
     fontSize: FontSize.xs,

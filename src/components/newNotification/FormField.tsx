@@ -5,6 +5,7 @@ import {
   TextInput,
   TextInputProps,
   TouchableOpacity,
+  ScrollView,
   View,
 } from "react-native";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
@@ -64,7 +65,11 @@ export function PickerField({
       <Text style={styles.label}>{label}</Text>
 
       <TouchableOpacity
-        style={[styles.input, styles.pickerTrigger, !!error && styles.inputError]}
+        style={[
+          styles.input,
+          styles.pickerTrigger,
+          !!error && styles.inputError,
+        ]}
         onPress={() => setOpen((v) => !v)}
         activeOpacity={0.8}
       >
@@ -76,25 +81,35 @@ export function PickerField({
 
       {open && (
         <View style={styles.dropdown}>
-          {options.map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              style={[styles.dropdownItem, opt === value && styles.dropdownItemActive]}
-              onPress={() => {
-                onSelect(opt);
-                setOpen(false);
-              }}
-            >
-              <Text
+          <ScrollView
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {options.map((opt) => (
+              <TouchableOpacity
+                key={opt}
                 style={[
-                  styles.dropdownText,
-                  opt === value && styles.dropdownTextActive,
+                  styles.dropdownItem,
+                  opt === value && styles.dropdownItemActive,
                 ]}
+                onPress={() => {
+                  onSelect(opt);
+                  setOpen(false);
+                }}
+                activeOpacity={0.7}
               >
-                {opt}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.dropdownText,
+                    opt === value && styles.dropdownTextActive,
+                  ]}
+                >
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -112,7 +127,12 @@ interface SegmentedPickerProps {
   onSelect: (v: string) => void;
 }
 
-export function SegmentedPicker({ label, options, value, onSelect }: SegmentedPickerProps) {
+export function SegmentedPicker({
+  label,
+  options,
+  value,
+  onSelect,
+}: SegmentedPickerProps) {
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
@@ -124,7 +144,12 @@ export function SegmentedPicker({ label, options, value, onSelect }: SegmentedPi
             onPress={() => onSelect(opt)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.segmentText, opt === value && styles.segmentTextActive]}>
+            <Text
+              style={[
+                styles.segmentText,
+                opt === value && styles.segmentTextActive,
+              ]}
+            >
               {opt}
             </Text>
           </TouchableOpacity>

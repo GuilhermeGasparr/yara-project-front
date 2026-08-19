@@ -1,36 +1,98 @@
-import { LoginPayload, LoginResponse } from "@/types";
+import { LoginPayload, LoginResponse, AuthUser } from "@/types";
 
-// 1. Troque pelo link gerado pelo Ngrok que está no seu terminal
 const BASE_URL = "https://confutable-marybeth-throatily.ngrok-free.dev";
 
-/**
- * Faz login enviando email + senha como form-data (padrão OAuth2 do FastAPI)
- * e retorna o access_token JWT.
- */
+const BASE_HEADERS: Record<string, string> = {
+  "ngrok-skip-browser-warning": "true",
+};
+
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
+  } catch {
+    throw new Error("Token inválido ou corrompido.");
+  }
+}
+
+export function buildUserFromToken(
+  token: string,
+  extras?: Record<string, unknown>
+): AuthUser {
+  const payload = decodeJwtPayload(token);
+  const tipo    = payload["tipo"] as string;
+  const id      = parseInt(payload["sub"] as string, 10);
+
+  const exp = payload["exp"] as number;
+  if (exp && Date.now() / 1000 > exp) {
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
+
+  if (tipo === "ACS/ACE") {
+    return {
+      role:        "agente",
+      id,
+      nome:        (extras?.["nome"]  as string) ?? "",
+      email:       (extras?.["email"] as string) ?? "",
+      cargo:       (extras?.["cargo"] as string) ?? "ACS",
+      ubs_atuante: (extras?.["ubs"]   as number) ?? 0,
+    };
+  }
+
+  if (tipo === "UBS") {
+    return {
+      role:      "ubs",
+      id,
+      nome:      (extras?.["nome"]      as string) ?? "",
+      email:     (extras?.["email"]     as string) ?? "",
+      ubs:       (extras?.["ubs"]       as string) ?? "",
+      municipio: (extras?.["municipio"] as string) ?? "",
+    };
+  }
+
+  if (tipo === "CM") {
+    return {
+      role:      "cm",
+      id,
+      nome:      (extras?.["nome"]      as string) ?? "",
+      email:     (extras?.["email"]     as string) ?? "",
+      cargo:     (extras?.["cargo"]     as string) ?? "",
+      municipio: (extras?.["municipio"] as string) ?? "",
+    };
+  }
+
+  throw new Error(`Tipo de usuário desconhecido: ${tipo}`);
+}
+
 export async function loginRequest(
-  payload: LoginPayload,
+  payload: LoginPayload
 ): Promise<LoginResponse> {
   const form = new URLSearchParams();
+
   form.append("username", payload.email);
   form.append("password", payload.senha);
-  form.append("tipo_login", payload.tipo_login);
-  
+  form.append("tipo_login", payload.tipo_login ?? "");
+
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
-    headers: { 
+    headers: {
+      ...BASE_HEADERS,
       "Content-Type": "application/x-www-form-urlencoded",
-      // 2. Adicione esta linha para pular o aviso do Ngrok nas chamadas POST
-      "ngrok-skip-browser-warning": "true" 
     },
     body: form.toString(),
   });
 
   const data = await res.json();
-  
-  if (!res.ok) {
-    throw new Error(data.detail ?? "Erro ao autenticar. Tente novamente.");
-  }
-  
-  return data as LoginResponse;
-}
 
+  if (!res.ok) {
+    throw new Error(
+      data.detail ?? "Erro ao autenticar. Tente novamente."
+    );
+  }
+
+  return {
+    access_token: data.access_token,
+    token_type: data.type_token,
+    usuario: data.usuario,
+  };
+}

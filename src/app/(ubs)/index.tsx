@@ -1,369 +1,1201 @@
-import React, { useEffect, useState } from 'react';
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
+  buscarDadosUBS,
+  complementarNotificacao,
+  DadosUBS,
+  encaminharNotificacao,
+  listarNotificacoesUBS,
+  NotificacaoStatus,
+  NotificacaoUBS,
+  validarNotificacao,
+} from "@/services/UbsService";
+import { UBSUser } from "@/types";
+import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
   ActivityIndicator,
   Alert,
-  RefreshControl,
+  Animated,
   Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
   TextInput,
-} from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
-import {
-  buscarNotificacoesUBS,
-  validarNotificacaoAPI,
-  encaminharNotificacaoAPI,
-  complementarNotificacaoAPI,
-  obterDetalhesNotificacaoAPI,
-  NotificacaoUBS,
-} from '@/services/UbsService';
+  TouchableOpacity,
+  View,
+} from "react-native";
+// ─── Configurações de status ───────────────────────────────────────────────────
+
+const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
+  {
+    "EM ANDAMENTO": { label: "Pendente", bg: "#FAEEDA", color: "#854F0B" },
+    VALIDADA: { label: "Validada", bg: Colors.teal50, color: Colors.teal800 },
+    ENCAMINHADA: { label: "Encaminhada", bg: "#E6F1FB", color: "#0C447C" },
+    COMPLEMENTADA: { label: "Complementada", bg: "#EEEDFE", color: "#534AB7" },
+    "EM INVESTIGAÇÃO": {
+      label: "Em investigação",
+      bg: "#FAEEDA",
+      color: "#854F0B",
+    },
+    CONFIRMADO: {
+      label: "Confirmado",
+      bg: Colors.teal50,
+      color: Colors.teal800,
+    },
+    DESCARTADO: {
+      label: "Descartado",
+      bg: Colors.gray50,
+      color: Colors.gray600,
+    },
+    ENCERRADO: { label: "Encerrado", bg: Colors.gray50, color: Colors.gray400 },
+  };
+
+const CATEGORIA_COLOR: Record<string, string> = {
+  DOENÇA: Colors.red400,
+  EPIZOOTIA: "#BA7517",
+  DESASTRE: "#378ADD",
+};
+
+// ─── Componentes auxiliares ───────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: NotificacaoStatus }) {
+  const cfg = STATUS_CFG[status] ?? STATUS_CFG["EM ANDAMENTO"];
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+function StatsCard({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statNum}>{value}</Text>
+      <Text style={styles.statLbl}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Modal de complementar ────────────────────────────────────────────────────
+
+interface ComplementarModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (texto: string) => Promise<void>;
+}
+
+function ComplementarModal({
+  visible,
+  onClose,
+  onConfirm,
+}: ComplementarModalProps) {
+  const [texto, setTexto] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleConfirm() {
+    if (!texto.trim()) return;
+    setLoading(true);
+    await onConfirm(texto.trim());
+    setLoading(false);
+    setTexto("");
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalBox}>
+          <Text style={styles.modalTitle}>Complementar notificação</Text>
+          <Text style={styles.modalSub}>
+            Adicione informações ao registro. O texto será anexado à descrição
+            original.
+          </Text>
+          <TextInput
+            style={styles.modalInput}
+            value={texto}
+            onChangeText={setTexto}
+            placeholder="Descreva o complemento..."
+            placeholderTextColor={Colors.gray200}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            autoFocus
+          />
+          <View style={styles.modalBtns}>
+            <TouchableOpacity
+              style={styles.modalBtnOutline}
+              onPress={onClose}
+              disabled={loading}
+            >
+              <Text style={styles.modalBtnOutlineText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modalBtnSolid,
+                !texto.trim() && styles.modalBtnDisabled,
+              ]}
+              onPress={handleConfirm}
+              disabled={loading || !texto.trim()}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <Text style={styles.modalBtnSolidText}>Salvar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Card de notificação ──────────────────────────────────────────────────────
+
+interface NotifCardProps {
+  item: NotificacaoUBS;
+  onValidar: () => void;
+  onEncaminhar: () => void;
+  onComplementar: () => void;
+  onPress: () => void;
+  loadingId: number | null;
+}
+
+function NotifCard({
+  item,
+  onValidar,
+  onEncaminhar,
+  onComplementar,
+  onPress,
+  loadingId,
+}: NotifCardProps) {
+  const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
+
+  const isPending =
+    item.status === "EM ANDAMENTO" || item.status === "COMPLEMENTADA";
+
+  const isLoading = loadingId === item.id;
+
+  const dataFormatada = new Date(item.data_envio).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.notifCard,
+        isPending && styles.notifCardPending,
+        pressed && styles.notifCardPressed,
+      ]}
+    >
+      {/* Header */}
+      <View style={styles.notifHeader}>
+        <View style={styles.notifTitleRow}>
+          <View style={[styles.notifDot, { backgroundColor: dotColor }]} />
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.notifTitle} numberOfLines={1}>
+              {item.tipo_evento}
+            </Text>
+
+            <Text style={styles.notifMeta}>
+              {dataFormatada} · {item.local_ocorrencia}
+            </Text>
+          </View>
+        </View>
+
+        <StatusBadge status={item.status} />
+      </View>
+
+      {/* Info */}
+      <Text style={styles.notifInfo}>
+        {item.pessoas_animais_infectados_afetados} afetados · #
+        {String(item.id).padStart(4, "0")}
+      </Text>
+
+      {/* Ações */}
+      {isPending && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnValidar]}
+            onPress={onValidar}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={Colors.teal800} size="small" />
+            ) : (
+              <Text style={[styles.actionBtnText, { color: Colors.teal800 }]}>
+                ✓ Validar
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnEncaminhar]}
+            onPress={onEncaminhar}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.actionBtnText, { color: "#0C447C" }]}>
+              ↗ Encaminhar
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnComplementar]}
+            onPress={onComplementar}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.actionBtnText, { color: Colors.gray600 }]}>
+              Complementar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+interface NotifDetailModalProps {
+  item: NotificacaoUBS | null;
+  onClose: () => void;
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+
+      <Text style={styles.detailValue}>{value || "Não informado"}</Text>
+    </View>
+  );
+}
+
+function NotifDetailModal({ item, onClose }: NotifDetailModalProps) {
+  const [visible, setVisible] = useState(false);
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(40)).current;
+  const scaleAnim = useRef(new Animated.Value(0.96)).current;
+
+  useEffect(() => {
+    if (item) {
+      setVisible(true);
+
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 18,
+          stiffness: 180,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 18,
+          stiffness: 180,
+        }),
+      ]).start();
+    }
+  }, [item]);
+
+  function close() {
+    Animated.parallel([
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 30,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.97,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setVisible(false);
+      onClose();
+    });
+  }
+
+  if (!item || !visible) return null;
+
+  const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
+
+  const dataFormatada = new Date(item.data_envio).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={close}
+    >
+      <View style={styles.modalRoot}>
+        {/* Backdrop */}
+        <Animated.View
+          style={[
+            styles.modalBackdrop,
+            {
+              opacity: backdropAnim,
+            },
+          ]}
+        />
+
+        {/* Clique fora fecha */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+
+        <Animated.View
+          style={[
+            styles.detailModal,
+            {
+              opacity: backdropAnim,
+              transform: [{ translateY }, { scale: scaleAnim }],
+            },
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.detailHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.detailCategoryRow}>
+                <View
+                  style={[styles.detailDot, { backgroundColor: dotColor }]}
+                />
+
+                <Text style={styles.detailCategory}>{item.categoria}</Text>
+              </View>
+
+              <Text style={styles.detailTitle}>{item.tipo_evento}</Text>
+
+              <Text style={styles.detailId}>
+                Notificação #{String(item.id).padStart(4, "0")}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={close}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.closeBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.detailScroll}
+            contentContainerStyle={styles.detailContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Status */}
+            <View style={styles.detailStatusRow}>
+              <Text style={styles.detailSectionTitle}>Status</Text>
+
+              <StatusBadge status={item.status} />
+            </View>
+
+            {/* Informações principais */}
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>
+                Informações da ocorrência
+              </Text>
+
+              <DetailRow label="Tipo de evento" value={item.tipo_evento} />
+
+              <DetailRow label="Categoria" value={item.categoria} />
+
+              <DetailRow label="Data de envio" value={dataFormatada} />
+
+              <DetailRow
+                label="Local da ocorrência"
+                value={item.local_ocorrencia}
+              />
+
+              <DetailRow
+                label="Pessoas / animais afetados"
+                value={String(item.pessoas_animais_infectados_afetados)}
+              />
+            </View>
+
+            {/* Situação */}
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>
+                Continuidade da situação
+              </Text>
+
+              <View style={styles.descriptionBox}>
+                <Text style={styles.descriptionText}>
+                  {item.continuidade_situacao || "Não informado."}
+                </Text>
+              </View>
+            </View>
+
+            {/* Descrição */}
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Descrição detalhada</Text>
+
+              <View style={styles.descriptionBox}>
+                <Text style={styles.descriptionText}>
+                  {item.descricao || "Nenhuma descrição informada."}
+                </Text>
+              </View>
+            </View>
+
+            {/* Agente */}
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Origem</Text>
+
+              <DetailRow
+                label="Agente responsável"
+                value={item.acs_ace_nome ?? "Não informado"}
+              />
+            </View>
+
+            <View style={{ height: Spacing.xl }} />
+          </ScrollView>
+          {/* Footer */}
+          <View style={styles.detailFooter}>
+            <TouchableOpacity
+              style={styles.detailCloseButton}
+              onPress={close}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.detailCloseButtonText}>Fechar relatório</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Tela principal ───────────────────────────────────────────────────────────
 
 export default function UbsHomeScreen() {
+  const { user } = useAuth();
+  const ubsUser = user as UBSUser;
+
   const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [complementarTarget, setComplementarTarget] =
+    useState<NotificacaoUBS | null>(null);
+  const [selectedNotification, setSelectedNotification] =
+    useState<NotificacaoUBS | null>(null);
 
-  // Estados do Modal de Relatório
-  const [itemSelecionado, setItemSelecionado] = useState<any | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
-  const [textoComplemento, setTextoComplemento] = useState('');
-  const [mostrarCampoComplemento, setMostrarCampoComplemento] = useState(false);
+  // ─── Stats derivadas ─────────────────────────────────────────────────────────
+  const [dadosUBS, setDadosUBS] = useState<DadosUBS | null>(null);
 
   useEffect(() => {
-    carregarNotificacoes();
-  }, []);
+    async function carregarDadosUBS() {
+      try {
+        const dados = await buscarDadosUBS();
+        setDadosUBS(dados);
+      } catch (error) {
+        console.error("Erro ao carregar dados da UBS:", error);
+      }
+    }
 
-  async function carregarNotificacoes() {
+    carregarDadosUBS();
+  }, []);
+  const stats = useMemo(
+    () => ({
+      recebidas: notificacoes.length,
+      pendentes: notificacoes.filter((n) => n.status === "EM ANDAMENTO").length,
+      encaminhadas: notificacoes.filter((n) => n.status === "ENCAMINHADA")
+        .length,
+    }),
+    [notificacoes],
+  );
+
+  // ─── Fetch ───────────────────────────────────────────────────────────────────
+
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
-      const data = await buscarNotificacoesUBS();
+      isRefresh ? setRefreshing(true) : setLoading(true);
+      const data = await listarNotificacoesUBS();
       setNotificacoes(data);
-    } catch (err: any) {
-      Alert.alert('Erro', err.message ?? 'Falha ao carregar notificações.');
+    } catch (err) {
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Não foi possível carregar.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, []);
 
-  async function abrirRelatorio(id: number) {
-    try {
-      setModalVisible(true);
-      setLoadingDetalhes(true);
-      setMostrarCampoComplemento(false);
-      setTextoComplemento('');
-      const detalhes = await obterDetalhesNotificacaoAPI(id);
-      setItemSelecionado(detalhes);
-    } catch (err: any) {
-      Alert.alert('Erro', err.message);
-      setModalVisible(false);
-    } finally {
-      setLoadingDetalhes(false);
-    }
-  }
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ─── Ações ───────────────────────────────────────────────────────────────────
 
   async function handleValidar(id: number) {
+    setLoadingId(id);
     try {
-      await validarNotificacaoAPI(id);
-      Alert.alert('Sucesso', 'Notificação validada com sucesso.');
-      setModalVisible(false);
-      carregarNotificacoes();
-    } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      await validarNotificacao(id);
+      setNotificacoes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, status: "VALIDADA" } : n)),
+      );
+    } catch (err) {
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Tente novamente.",
+      );
+    } finally {
+      setLoadingId(null);
     }
   }
 
   async function handleEncaminhar(id: number) {
+    setLoadingId(id);
     try {
-      await encaminharNotificacaoAPI(id);
-      Alert.alert('Sucesso', 'Notificação encaminhada com sucesso.');
-      setModalVisible(false);
-      carregarNotificacoes();
-    } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      await encaminharNotificacao(id);
+      setNotificacoes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, status: "ENCAMINHADA" } : n)),
+      );
+    } catch (err) {
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Tente novamente.",
+      );
+    } finally {
+      setLoadingId(null);
     }
   }
 
-  async function handleSalvarComplemento(id: number) {
-    if (!textoComplemento.trim()) {
-      Alert.alert('Aviso', 'Escreva uma informação para complementar.');
-      return;
-    }
+  async function handleComplementar(texto: string) {
+    if (!complementarTarget) return;
+    const id = complementarTarget.id;
     try {
-      await complementarNotificacaoAPI(id, textoComplemento);
-      Alert.alert('Sucesso', 'Informação acrescentada à notificação!');
-      setMostrarCampoComplemento(false);
-      abrirRelatorio(id);
-    } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      await complementarNotificacao(id, texto);
+      setNotificacoes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, status: "COMPLEMENTADA" } : n)),
+      );
+    } catch (err) {
+      Alert.alert(
+        "Erro",
+        err instanceof Error ? err.message : "Tente novamente.",
+      );
+    } finally {
+      setComplementarTarget(null);
     }
   }
 
-  const pendentes = notificacoes.filter((n) => n.status === 'EM ANDAMENTO');
-  const encaminhadas = notificacoes.filter((n) => n.status === 'ENCAMINHADA' || n.status === 'VALIDADA');
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B664F" />
+    <View style={styles.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.teal600} />
 
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSubtitle}>Unidade de Saúde</Text>
-          <Text style={styles.headerTitle}>USF Vila Verde</Text>
+      {/* Topbar */}
+      <View style={styles.topbar}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.appLabel}>Unidade de Saúde</Text>
+          <Text style={styles.topbarTitle} numberOfLines={1}>
+            {dadosUBS?.nome ?? "UBS"}
+          </Text>
         </View>
-        <TouchableOpacity style={styles.bellButton}>
-          <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+
+        {/* Perfil */}
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => router.push("/(ubs)/profile")}
+          activeOpacity={0.8}
+          hitSlop={8}
+        >
+          <View style={styles.profileBtnInner}>
+            <Text style={styles.profileBtnText}>
+              {ubsUser?.nome ? ubsUser.nome[0].toUpperCase() : "U"}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); carregarNotificacoes(); }} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            tintColor={Colors.teal400}
+            colors={[Colors.teal600]}
+          />
         }
       >
-        <View style={styles.alertCard}>
-          <Feather name="alert-triangle" size={20} color="#B45309" />
-          <Text style={styles.alertText}>
-            <Text style={styles.alertTextBold}>{pendentes.length} notificações</Text> aguardam validação da unidade.
-          </Text>
+        {/* Banner de pendentes */}
+        {stats.pendentes > 0 && (
+          <View style={styles.alertBanner}>
+            <Text style={styles.alertIcon}>⚠</Text>
+            <Text style={styles.alertText}>
+              <Text style={{ fontWeight: "700" }}>
+                {stats.pendentes} notificaç
+                {stats.pendentes === 1 ? "ão" : "ões"}
+              </Text>{" "}
+              aguarda{stats.pendentes === 1 ? "" : "m"} validação da unidade.
+            </Text>
+          </View>
+        )}
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <StatsCard value={stats.recebidas} label="Recebidas" />
+          <StatsCard value={stats.pendentes} label="Pendentes" />
+          <StatsCard value={stats.encaminhadas} label="Encaminhadas" />
         </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{notificacoes.length}</Text>
-            <Text style={styles.statLabel}>Recebidas</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{pendentes.length}</Text>
-            <Text style={styles.statLabel}>Pendentes</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{encaminhadas.length}</Text>
-            <Text style={styles.statLabel}>Encaminhadas</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionHeader}>NOTIFICAÇÕES DO TERRITÓRIO</Text>
+        {/* Lista */}
+        <Text style={styles.sectionLabel}>Notificações do território</Text>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#0B664F" style={{ marginTop: 20 }} />
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={Colors.teal400} size="large" />
+            <Text style={styles.loadingText}>Carregando notificações...</Text>
+          </View>
+        ) : notificacoes.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyEmoji}>📋</Text>
+            <Text style={styles.emptyText}>
+              Nenhuma notificação recebida ainda.
+            </Text>
+          </View>
         ) : (
-          notificacoes.map((item) => {
-            const isPendente = item.status === 'EM ANDAMENTO';
-
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.card, isPendente && styles.cardBorderPendente]}
-                onPress={() => abrirRelatorio(item.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>{item.nome}</Text>
-                  <View style={[styles.badge, isPendente ? styles.badgePendente : styles.badgeEncerrado]}>
-                    <Text style={[styles.badgeText, isPendente ? styles.badgeTextPendente : styles.badgeTextEncerrado]}>
-                      {isPendente ? 'Pendente' : item.status}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.cardMeta}>
-                  {new Date(item.data_envio).toLocaleDateString('pt-BR')} · {item.tipo_evento}
-                </Text>
-
-                <Text style={styles.cardSubtext}>
-                  {item.pessoas_animais_infectados_afetados > 0 &&
-                    `${item.pessoas_animais_infectados_afetados} afetados · `}
-                  #{new Date().getFullYear()}-{String(item.id).padStart(4, '0')}
-                </Text>
-
-                <View style={styles.actionsContainer}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnValidar]}
-                    onPress={() => handleValidar(item.id)}
-                  >
-                    <Feather name="check" size={16} color="#065F46" />
-                    <Text style={styles.btnValidarText}>Validar</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnEncaminhar]}
-                    onPress={() => handleEncaminhar(item.id)}
-                  >
-                    <Feather name="corner-up-right" size={16} color="#1E40AF" />
-                    <Text style={styles.btnEncaminharText}>Encaminhar</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnComplementar]}
-                    onPress={() => abrirRelatorio(item.id)}
-                  >
-                    <Text style={styles.btnComplementarText}>Relatório</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })
+          notificacoes.map((item) => (
+            <NotifCard
+              key={item.id}
+              item={item}
+              loadingId={loadingId}
+              onValidar={() => handleValidar(item.id)}
+              onEncaminhar={() => handleEncaminhar(item.id)}
+              onComplementar={() => setComplementarTarget(item)}
+              onPress={() => setSelectedNotification(item)}
+            />
+          ))
         )}
+
+        <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
-      {/* Modal do Relatório Completo */}
-      <Modal visible={modalVisible} animationType="slide" transparent={false}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
-              <Feather name="x" size={24} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.modalHeaderTitle}>Relatório da Notificação</Text>
-            <View style={{ width: 24 }} />
-          </View>
+      {/* FAB — criar agente */}
+      <TouchableOpacity
+        style={fabStyles.fab}
+        onPress={() => router.push("/(ubs)/createAgent")}
+        activeOpacity={0.88}
+      >
+        <Text style={fabStyles.fabIcon}>＋</Text>
+        <Text style={fabStyles.fabLabel}>Novo agente</Text>
+      </TouchableOpacity>
 
-          {loadingDetalhes ? (
-            <ActivityIndicator size="large" color="#0B664F" style={{ marginTop: 40 }} />
-          ) : itemSelecionado ? (
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={styles.reportTitle}>{itemSelecionado.nome}</Text>
-
-              <View style={styles.reportRow}>
-                <Text style={styles.reportLabel}>Status:</Text>
-                <Text style={styles.reportValue}>{itemSelecionado.status}</Text>
-              </View>
-
-              <View style={styles.reportRow}>
-                <Text style={styles.reportLabel}>Categoria / Evento:</Text>
-                <Text style={styles.reportValue}>
-                  {itemSelecionado.categoria} — {itemSelecionado.tipo_evento}
-                </Text>
-              </View>
-
-              <View style={styles.reportRow}>
-                <Text style={styles.reportLabel}>Local da Ocorrência:</Text>
-                <Text style={styles.reportValue}>{itemSelecionado.local_ocorrencia}</Text>
-              </View>
-
-              <View style={styles.reportRow}>
-                <Text style={styles.reportLabel}>Pessoas/Animais Afetados:</Text>
-                <Text style={styles.reportValue}>{itemSelecionado.pessoas_animais_infectados_afetados}</Text>
-              </View>
-
-              <View style={styles.reportSection}>
-                <Text style={styles.reportSectionTitle}>Descrição / Observações:</Text>
-                <Text style={styles.reportDescription}>{itemSelecionado.descricao}</Text>
-              </View>
-
-              {/* Formulário para complementar */}
-              {mostrarCampoComplemento ? (
-                <View style={styles.complementBox}>
-                  <Text style={styles.complementTitle}>Adicionar Informação Complementar</Text>
-                  <TextInput
-                    style={styles.complementInput}
-                    multiline
-                    placeholder="Digite observações de campo ou notas de atendimento..."
-                    value={textoComplemento}
-                    onChangeText={setTextoComplemento}
-                  />
-                  <TouchableOpacity
-                    style={styles.btnSalvarComplemento}
-                    onPress={() => handleSalvarComplemento(itemSelecionado.id)}
-                  >
-                    <Text style={styles.btnSalvarComplementoText}>Salvar Complemento</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.btnAbrirComplemento}
-                  onPress={() => setMostrarCampoComplemento(true)}
-                >
-                  <Feather name="plus-circle" size={16} color="#0B664F" />
-                  <Text style={styles.btnAbrirComplementoText}>Complementar Notificação</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Botões de Ação Final */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.btnValidar, { paddingVertical: 12 }]}
-                  onPress={() => handleValidar(itemSelecionado.id)}
-                >
-                  <Feather name="check" size={18} color="#065F46" />
-                  <Text style={[styles.btnValidarText, { fontSize: 14 }]}>Validar Chamado</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.btnEncaminhar, { paddingVertical: 12 }]}
-                  onPress={() => handleEncaminhar(itemSelecionado.id)}
-                >
-                  <Feather name="corner-up-right" size={18} color="#1E40AF" />
-                  <Text style={[styles.btnEncaminharText, { fontSize: 14 }]}>Encaminhar</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          ) : null}
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+      {/* Modal de complementar */}
+      <ComplementarModal
+        visible={!!complementarTarget}
+        onClose={() => setComplementarTarget(null)}
+        onConfirm={handleComplementar}
+      />
+      <NotifDetailModal
+        item={selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+      />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F7F6' },
-  header: { backgroundColor: '#0B664F', paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerSubtitle: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 12 },
-  headerTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
-  bellButton: { padding: 4 },
-  scrollContent: { padding: 16, paddingBottom: 32 },
-  alertCard: { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#D97706' },
-  alertText: { color: '#92400E', fontSize: 13, flex: 1 },
-  alertTextBold: { fontWeight: '700' },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  statNumber: { fontSize: 22, fontWeight: '700', color: '#0B664F', marginBottom: 2 },
-  statLabel: { fontSize: 12, color: '#6B7280' },
-  sectionHeader: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 12, letterSpacing: 0.5 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  cardBorderPendente: { borderLeftWidth: 4, borderLeftColor: '#D97706' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', flex: 1, marginRight: 8 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgePendente: { backgroundColor: '#FEF3C7' },
-  badgeEncerrado: { backgroundColor: '#F3F4F6' },
-  badgeText: { fontSize: 11, fontWeight: '600' },
-  badgeTextPendente: { color: '#D97706' },
-  badgeTextEncerrado: { color: '#9CA3AF' },
-  cardMeta: { fontSize: 12, color: '#6B7280', marginBottom: 6 },
-  cardSubtext: { fontSize: 13, color: '#4B5563', marginBottom: 12 },
-  actionsContainer: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  actionBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 },
-  btnValidar: { backgroundColor: '#E6F4EA' },
-  btnValidarText: { color: '#065F46', fontWeight: '700', fontSize: 12 },
-  btnEncaminhar: { backgroundColor: '#EFF6FF' },
-  btnEncaminharText: { color: '#1E40AF', fontWeight: '700', fontSize: 12 },
-  btnComplementar: { backgroundColor: '#F3F4F6' },
-  btnComplementarText: { color: '#4B5563', fontWeight: '700', fontSize: 12 },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  // Estilos do Modal
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  modalHeaderTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  reportTitle: { fontSize: 20, fontWeight: '700', color: '#0B664F', marginBottom: 16 },
-  reportRow: { marginBottom: 12 },
-  reportLabel: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
-  reportValue: { fontSize: 15, color: '#1F2937', fontWeight: '500', marginTop: 2 },
-  reportSection: { marginTop: 12, marginBottom: 20 },
-  reportSectionTitle: { fontSize: 13, color: '#374151', fontWeight: '700', marginBottom: 6 },
-  reportDescription: { fontSize: 14, color: '#4B5563', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#F3F4F6' },
-  modalActions: { flexDirection: 'column', gap: 10, marginTop: 24, marginBottom: 40 },
-  btnAbrirComplemento: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 10 },
-  btnAbrirComplementoText: { color: '#0B664F', fontWeight: '700', fontSize: 14 },
-  complementBox: { backgroundColor: '#F0FDF4', padding: 12, borderRadius: 10, marginVertical: 10 },
-  complementTitle: { fontSize: 13, fontWeight: '700', color: '#166534', marginBottom: 8 },
-  complementInput: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCFCE7', borderRadius: 8, padding: 10, height: 80, textAlignVertical: 'top', marginBottom: 10 },
-  btnSalvarComplemento: { backgroundColor: '#0B664F', padding: 10, borderRadius: 8, alignItems: 'center' },
-  btnSalvarComplementoText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: Colors.bg },
+
+  // Topbar
+  topbar: {
+    backgroundColor: Colors.teal600,
+    paddingTop: 52,
+    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+  appLabel: {
+    fontSize: FontSize.xs,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+  topbarTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.white,
+    letterSpacing: -0.3,
+  },
+  profileBtn: { paddingBottom: 2 },
+  profileBtnInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.35)",
+  },
+  profileBtnText: {
+    fontSize: FontSize.base,
+    fontWeight: "700",
+    color: Colors.white,
+  },
+
+  // Scroll
+  scroll: { flex: 1 },
+  content: { padding: Spacing.lg },
+
+  // Alert banner
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: "#FAEEDA",
+    borderLeftWidth: 3,
+    borderLeftColor: "#BA7517",
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  alertIcon: { fontSize: 16, color: "#BA7517" },
+  alertText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: "#854F0B",
+    lineHeight: 20,
+  },
+
+  // Stats
+  statsRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
+  statCard: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  statNum: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: Colors.teal600,
+    letterSpacing: -0.5,
+  },
+  statLbl: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
+
+  // Section label
+  sectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: Spacing.md,
+  },
+
+  // Notif card
+  notifCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  notifCardPending: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#BA7517",
+  },
+  notifHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  notifTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  notifDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+    flexShrink: 0,
+  },
+  notifTitle: {
+    fontSize: FontSize.base,
+    fontWeight: "600",
+    color: Colors.gray900,
+  },
+  notifMeta: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
+  notifInfo: {
+    fontSize: FontSize.xs,
+    color: Colors.gray400,
+    marginBottom: Spacing.md,
+    marginLeft: 20,
+  },
+
+  // Badges
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  badgeText: { fontSize: 10, fontWeight: "600" },
+
+  // Action buttons
+  actionsRow: { flexDirection: "row", gap: Spacing.sm },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: Radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    minHeight: 36,
+  },
+  actionBtnText: { fontSize: 11, fontWeight: "600" },
+  actionBtnValidar: {
+    backgroundColor: Colors.teal50,
+    borderColor: Colors.teal100,
+  },
+  actionBtnEncaminhar: { backgroundColor: "#E6F1FB", borderColor: "#B5D4F4" },
+  actionBtnComplementar: {
+    backgroundColor: Colors.gray50,
+    borderColor: Colors.gray100,
+  },
+
+  // Loading / empty
+  loadingWrap: {
+    paddingVertical: Spacing.xxl,
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  loadingText: { fontSize: FontSize.sm, color: Colors.gray400 },
+  emptyWrap: {
+    paddingVertical: Spacing.xxl,
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  emptyEmoji: { fontSize: 40 },
+  emptyText: { fontSize: FontSize.sm, color: Colors.gray400 },
+
+  // Modal complementar
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalBox: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.gray900,
+  },
+  modalSub: { fontSize: FontSize.sm, color: Colors.gray400, lineHeight: 20 },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: Colors.gray100,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.gray900,
+    minHeight: 100,
+    backgroundColor: Colors.bg,
+  },
+  modalBtns: { flexDirection: "row", gap: Spacing.md },
+  modalBtnOutline: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.teal600,
+    alignItems: "center",
+  },
+  modalBtnOutlineText: {
+    fontSize: FontSize.base,
+    fontWeight: "600",
+    color: Colors.teal600,
+  },
+  modalBtnSolid: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.teal600,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 46,
+  },
+  modalBtnSolidText: {
+    fontSize: FontSize.base,
+    fontWeight: "700",
+    color: Colors.white,
+  },
+  modalBtnDisabled: { opacity: 0.4 },
+  notifCardPressed: {
+    transform: [{ scale: 0.985 }],
+    opacity: 0.92,
+  },
+
+  notifCardHovered: {
+    transform: [{ translateY: -2 }],
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  // ─── Detail modal ────────────────────────────────────────────────────────────
+
+  modalRoot: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.lg,
+  },
+
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(5, 35, 29, 0.55)",
+  },
+
+  detailModal: {
+    width: "100%",
+    maxWidth: 620,
+    maxHeight: "88%",
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    overflow: "hidden",
+
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray50,
+  },
+
+  detailCategoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 5,
+  },
+
+  detailDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  detailCategory: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+
+  detailTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: "800",
+    color: Colors.gray900,
+    marginTop: 2,
+  },
+
+  detailId: {
+    fontSize: FontSize.xs,
+    color: Colors.gray400,
+    marginTop: 4,
+  },
+
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray50,
+  },
+
+  closeBtnText: {
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: "300",
+    color: Colors.gray600,
+  },
+
+  detailScroll: {
+    flexGrow: 0,
+  },
+
+  detailContent: {
+    padding: Spacing.lg,
+  },
+
+  detailStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingBottom: Spacing.md,
+    marginBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray50,
+  },
+
+  detailSection: {
+    marginBottom: Spacing.lg,
+  },
+
+  detailSectionTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray900,
+    marginBottom: Spacing.sm,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray50,
+    gap: Spacing.md,
+  },
+
+  detailLabel: {
+    flex: 0.9,
+    fontSize: FontSize.sm,
+    color: Colors.gray400,
+  },
+
+  detailValue: {
+    flex: 1.4,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray900,
+    textAlign: "right",
+  },
+
+  descriptionBox: {
+    backgroundColor: Colors.gray50,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.06)",
+  },
+
+  descriptionText: {
+    fontSize: FontSize.sm,
+    lineHeight: 21,
+    color: Colors.gray600,
+  },
+
+  detailFooter: {
+    padding: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray50,
+  },
+
+  detailCloseButton: {
+    backgroundColor: Colors.teal600,
+    borderRadius: Radius.md,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+
+  detailCloseButtonText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+  },
+});
+
+const fabStyles = StyleSheet.create({
+  fab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    backgroundColor: Colors.teal600,
+    borderRadius: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    gap: 8,
+    shadowColor: Colors.teal800,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabIcon: { fontSize: 18, color: "#fff", fontWeight: "300" },
+  fabLabel: { fontSize: 14, fontWeight: "700", color: "#fff" },
 });
