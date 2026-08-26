@@ -1,6 +1,6 @@
 import { LoginPayload, LoginResponse, AuthUser } from "@/types";
 
-const BASE_URL = "https://confutable-marybeth-throatily.ngrok-free.dev";
+const BASE_URL = "https://yara-project.onrender.com";
 
 const BASE_HEADERS: Record<string, string> = {
   "ngrok-skip-browser-warning": "true",

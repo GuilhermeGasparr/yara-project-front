@@ -1,6 +1,6 @@
 import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
