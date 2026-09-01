@@ -4,7 +4,7 @@ import { useLoginForm } from "@/hooks/useLoginForm";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -253,7 +253,7 @@ interface FieldProps {
   error?: string;
   touched?: boolean;
   secureTextEntry?: boolean;
-  keyboardType?: "default" | "email-address";
+  keyboardType?: "default";
   autoCapitalize?: "none" | "sentences";
   returnKeyType?: "next" | "done";
   onChangeText: (v: string) => void;
@@ -376,19 +376,22 @@ export default function LoginScreen() {
     ]).start();
   }
 
-  async function handleSubmit() {
-    setApiError(null);
-
+  const handleSubmit = async () => {
     if (!validateAll()) {
       shake();
       return;
     }
 
+    if (!form.tipo_login) {
+      return;
+    }
+
     setLoading(true);
+    setApiError("");
 
     try {
       await signIn({
-        email: form.email.trim().toLowerCase(),
+        cpf: form.cpf.trim(),
         senha: form.senha,
         tipo_login: form.tipo_login,
       });
@@ -408,7 +411,7 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  };
   const hasTipoError = touched.tipo_login && !!errors.tipo;
 
   return (
@@ -467,15 +470,15 @@ export default function LoginScreen() {
             )}
 
             <Field
-              label="E-mail institucional"
-              value={form.email}
-              placeholder="seu@email.com"
-              keyboardType="email-address"
+              label="CPF"
+              value={form.cpf}
+              placeholder="000.000.000-00"
+              keyboardType="default"
               returnKeyType="next"
-              error={errors.email}
-              touched={touched.email}
-              onChangeText={(v) => handleChange("email", v)}
-              onBlur={() => handleBlur("email")}
+              error={errors.cpf}
+              touched={touched.cpf}
+              onChangeText={(v) => handleChange("cpf", v)}
+              onBlur={() => handleBlur("cpf")}
               onSubmitEditing={() => senhaRef.current?.focus()}
             />
 

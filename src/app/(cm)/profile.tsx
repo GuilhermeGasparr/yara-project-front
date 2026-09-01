@@ -123,8 +123,8 @@ export default function ProfileScreen() {
           />
 
           <InfoRow
-            label="E-mail"
-            value={cm?.email ?? "—"}
+            label="CPF"
+            value={cm?.cpf ?? "—"}
           />
 
           <InfoRow

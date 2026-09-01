@@ -1,22 +1,20 @@
 import { useState } from 'react';
 
 interface LoginForm {
-  email: string;
+  cpf: string;
   senha: string;
-  tipo_login: "ACS/ACE" | "UBS" | "CM" |"";
+  tipo_login: "ACS/ACE" | "UBS" | "CM" | "";
 }
 
 interface LoginErrors {
-  email?: string;
+  cpf?: string;
   senha?: string;
   tipo?: string;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function useLoginForm() {
   const [form, setForm] = useState<LoginForm>({
-    email: "",
+    cpf: "",
     senha: "",
     tipo_login: "",
   });
@@ -24,28 +22,30 @@ export function useLoginForm() {
   const [errors, setErrors] = useState<LoginErrors>({});
 
   const [touched, setTouched] = useState<Record<keyof LoginForm, boolean>>({
-    email: false,
+    cpf: false,
     senha: false,
     tipo_login: false,
   });
 
-
   function validate(f: LoginForm): LoginErrors {
     const errs: LoginErrors = {};
 
-    if (!f.email.trim()) {
-      errs.email = 'E-mail obrigatório.';
-    } else if (!EMAIL_REGEX.test(f.email.trim())) {
-      errs.email = 'Informe um e-mail válido.';
+    // Remove pontos, traços e qualquer outro caractere que não seja número
+    const cpfNumeros = f.cpf.replace(/\D/g, "");
+
+    if (!cpfNumeros) {
+      errs.cpf = "CPF obrigatório.";
+    } else if (cpfNumeros.length !== 11) {
+      errs.cpf = "O CPF deve possuir 11 dígitos.";
     }
 
     if (!f.senha) {
-      errs.senha = 'Senha obrigatória.';
+      errs.senha = "Senha obrigatória.";
     } else if (f.senha.length < 6) {
-      errs.senha = 'A senha deve ter no mínimo 6 caracteres.';
+      errs.senha = "A senha deve ter no mínimo 6 caracteres.";
     }
-    
-    if(!f.tipo_login) {
+
+    if (!f.tipo_login) {
       errs.tipo = "Selecione o tipo de Usuário.";
     }
 
@@ -55,6 +55,7 @@ export function useLoginForm() {
   function handleChange(field: keyof LoginForm, value: string) {
     const updated = { ...form, [field]: value };
     setForm(updated);
+
     if (touched[field]) {
       setErrors(validate(updated));
     }
@@ -66,13 +67,27 @@ export function useLoginForm() {
   }
 
   function validateAll(): boolean {
-    setTouched({ email: true, senha: true, tipo_login: true });
+    setTouched({
+      cpf: true,
+      senha: true,
+      tipo_login: true,
+    });
+
     const errs = validate(form);
     setErrors(errs);
+
     return Object.keys(errs).length === 0;
   }
 
   const isValid = Object.keys(validate(form)).length === 0;
 
-  return { form, errors, touched, handleChange, handleBlur, validateAll, isValid };
+  return {
+    form,
+    errors,
+    touched,
+    handleChange,
+    handleBlur,
+    validateAll,
+    isValid,
+  };
 }

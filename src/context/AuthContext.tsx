@@ -89,7 +89,7 @@ export function AuthProvider({
       ...me,
       id: usuario.id,
       nome: usuario.nome,
-      email: usuario.email,
+      cpf: usuario.cpf,
       cargo: usuario.cargo ?? "",
     };
   } else if (me.role === "ubs") {
@@ -97,8 +97,8 @@ export function AuthProvider({
       ...me,
       id: usuario.id,
       nome: usuario.nome,
-      email: usuario.email,
-      ubs: String(usuario.ubs ?? ""),
+      cpf: usuario.cpf,
+      ubs: usuario.ubs ?? 0,
       municipio: usuario.municipio ?? "",
     };
   } else if (me.role === "cm") {
@@ -106,7 +106,7 @@ export function AuthProvider({
       ...me,
       id: usuario.id,
       nome: usuario.nome,
-      email: usuario.email,
+      cpf: usuario.cpf,
       cargo: "Coordenador Municipal",
       municipio: usuario.municipio ?? "",
     };
