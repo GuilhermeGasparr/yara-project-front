@@ -9,6 +9,7 @@ const BASE_HEADERS: Record<string, string> = {
 function decodeJwtPayload(token: string): Record<string, unknown> {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+
     return JSON.parse(atob(base64));
   } catch {
     throw new Error("Token inválido ou corrompido.");
@@ -17,46 +18,57 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
 
 export function buildUserFromToken(
   token: string,
-  extras?: Record<string, unknown>
+  extras?: Record<string, unknown>,
 ): AuthUser {
   const payload = decodeJwtPayload(token);
-  const tipo    = payload["tipo"] as string;
-  const id      = parseInt(payload["sub"] as string, 10);
+
+  const tipo = payload["tipo"] as string;
+  const id = parseInt(payload["sub"] as string, 10);
 
   const exp = payload["exp"] as number;
+
   if (exp && Date.now() / 1000 > exp) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 
+  // =========================
+  // ACS / ACE
+  // =========================
   if (tipo === "ACS/ACE") {
     return {
-      role:        "agente",
+      role: "agente",
       id,
-      nome:        (extras?.["nome"]  as string) ?? "",
-      email:       (extras?.["email"] as string) ?? "",
-      cargo:       (extras?.["cargo"] as string) ?? "ACS",
-      ubs_atuante: (extras?.["ubs"]   as number) ?? 0,
+      nome: (extras?.["nome"] as string) ?? "",
+      cpf: (extras?.["cpf"] as string) ?? "",
+      cargo: (extras?.["cargo"] as string) ?? "ACS",
+      ubs_atuante: (extras?.["ubs_atuante"] as number) ?? 0,
     };
   }
 
+  // =========================
+  // UBS
+  // =========================
   if (tipo === "UBS") {
     return {
-      role:      "ubs",
+      role: "ubs",
       id,
-      nome:      (extras?.["nome"]      as string) ?? "",
-      email:     (extras?.["email"]     as string) ?? "",
-      ubs:       (extras?.["ubs"]       as string) ?? "",
+      nome: (extras?.["nome"] as string) ?? "",
+      cpf: (extras?.["cpf"] as string) ?? "",
+      ubs: (extras?.["ubs"] as number) ?? 0,
       municipio: (extras?.["municipio"] as string) ?? "",
     };
   }
 
+  // =========================
+  // Coordenador Municipal
+  // =========================
   if (tipo === "CM") {
     return {
-      role:      "cm",
+      role: "cm",
       id,
-      nome:      (extras?.["nome"]      as string) ?? "",
-      email:     (extras?.["email"]     as string) ?? "",
-      cargo:     (extras?.["cargo"]     as string) ?? "",
+      nome: (extras?.["nome"] as string) ?? "",
+      cpf: (extras?.["cpf"] as string) ?? "",
+      cargo: (extras?.["cargo"] as string) ?? "Coordenador Municipal",
       municipio: (extras?.["municipio"] as string) ?? "",
     };
   }
@@ -65,11 +77,11 @@ export function buildUserFromToken(
 }
 
 export async function loginRequest(
-  payload: LoginPayload
+  payload: LoginPayload,
 ): Promise<LoginResponse> {
   const form = new URLSearchParams();
 
-  form.append("username", payload.email);
+  form.append("username", payload.cpf);
   form.append("password", payload.senha);
   form.append("tipo_login", payload.tipo_login ?? "");
 
@@ -85,9 +97,7 @@ export async function loginRequest(
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(
-      data.detail ?? "Erro ao autenticar. Tente novamente."
-    );
+    throw new Error(data.detail ?? "Erro ao autenticar. Tente novamente.");
   }
 
   return {

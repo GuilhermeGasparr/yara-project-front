@@ -81,7 +81,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionLabel}>Informações da conta</Text>
           <InfoRow label="Nome completo" value={agente?.nome ?? "—"} />
           <InfoRow label="Cargo" value={agente?.cargo ?? "—"} />
-          <InfoRow label="E-mail" value={agente?.email ?? "—"} />
+          <InfoRow label="CPF" value={agente?.cpf ?? "—"} />
         </View>
 
         <View style={styles.card}>

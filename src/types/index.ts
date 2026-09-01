@@ -4,7 +4,7 @@ export interface AgenteUser {
   role: "agente";
   id: number;
   nome: string;
-  email: string;
+  cpf: string;
   cargo: string;
   ubs_atuante: number;
 }
@@ -13,8 +13,8 @@ export interface UBSUser {
   role: "ubs";
   id: number;
   nome: string;
-  email: string;
-  ubs: string;
+  cpf: string;
+  ubs: number;
   municipio: string;
 }
 
@@ -22,7 +22,7 @@ export interface CMUser {
   role: "cm";
   id: number;
   nome: string;
-  email: string;
+  cpf: string;
   cargo: string;
   municipio: string;
 }
@@ -30,17 +30,18 @@ export interface CMUser {
 export type AuthUser = AgenteUser | UBSUser | CMUser;
 
 export interface LoginPayload {
-  email: string;
+  cpf: string;
   senha: string;
-  tipo_login?: string;
+  tipo_login?: "ACS/ACE" | "UBS" | "CM";
 }
 
 export interface LoginUsuario {
   id: number;
   nome: string;
-  email: string;
+  cpf: string;
   cargo?: string;
-  ubs?: string | number;
+  ubs?: number;
+  ubs_atuante?: number;
   municipio?: string;
 }
 

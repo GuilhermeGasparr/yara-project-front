@@ -26,7 +26,7 @@ const BASE_URL = "https://yara-project.onrender.com";
 
 async function criarAgente(payload: {
   nome: string;
-  email: string;
+  cpf: string;
   senha: string;
   cargo: "ACS" | "ACE";
   ubs_atuante: number;
@@ -36,7 +36,7 @@ async function criarAgente(payload: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify(payload),
@@ -55,7 +55,7 @@ interface CargoSelectorProps {
 }
 
 function CargoSelector({ value, onChange }: CargoSelectorProps) {
-  const sliderX    = useRef(new Animated.Value(0)).current;
+  const sliderX = useRef(new Animated.Value(0)).current;
   const [width, setWidth] = useState(0);
 
   function select(cargo: Cargo) {
@@ -78,16 +78,33 @@ function CargoSelector({ value, onChange }: CargoSelectorProps) {
         <Animated.View
           style={[
             styles.cargoSlider,
-            { width: width / 2 - 4, transform: [{ translateX: Animated.add(sliderX, 4) }] },
+            {
+              width: width / 2 - 4,
+              transform: [{ translateX: Animated.add(sliderX, 4) }],
+            },
           ]}
         />
       )}
       {(["ACS", "ACE"] as Cargo[]).map((cargo) => (
-        <Pressable key={cargo} style={styles.cargoOption} onPress={() => select(cargo)}>
-          <Text style={[styles.cargoText, value === cargo && styles.cargoTextActive]}>
+        <Pressable
+          key={cargo}
+          style={styles.cargoOption}
+          onPress={() => select(cargo)}
+        >
+          <Text
+            style={[
+              styles.cargoText,
+              value === cargo && styles.cargoTextActive,
+            ]}
+          >
             {cargo === "ACS" ? "🏥  ACS" : "🦟  ACE"}
           </Text>
-          <Text style={[styles.cargoDesc, value === cargo && styles.cargoDescActive]}>
+          <Text
+            style={[
+              styles.cargoDesc,
+              value === cargo && styles.cargoDescActive,
+            ]}
+          >
             {cargo === "ACS" ? "Agente Comunitário" : "Agente de Endemias"}
           </Text>
         </Pressable>
@@ -106,7 +123,7 @@ interface AnimatedFieldProps {
   onChangeText: (v: string) => void;
   error?: string;
   secureTextEntry?: boolean;
-  keyboardType?: "default" | "email-address";
+  keyboardType?: "default";
   autoCapitalize?: "none" | "words";
   returnKeyType?: "next" | "done";
   onSubmitEditing?: () => void;
@@ -175,11 +192,20 @@ function AnimatedField({
 
   const borderColor = borderAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [error ? Colors.red400 : Colors.gray100, error ? Colors.red400 : Colors.teal600],
+    outputRange: [
+      error ? Colors.red400 : Colors.gray100,
+      error ? Colors.red400 : Colors.teal600,
+    ],
   });
 
-  const labelTop = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [14, -9] });
-  const labelSize = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 11] });
+  const labelTop = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, -9],
+  });
+  const labelSize = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 11],
+  });
   const labelColor = labelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [Colors.gray200, error ? Colors.red400 : Colors.teal600],
@@ -192,9 +218,13 @@ function AnimatedField({
         <Animated.Text
           style={[
             styles.floatingLabel,
-            { top: labelTop, fontSize: labelSize, color: labelColor,
+            {
+              top: labelTop,
+              fontSize: labelSize,
+              color: labelColor,
               backgroundColor: value || focused ? Colors.white : "transparent",
-              paddingHorizontal: value || focused ? 4 : 0 },
+              paddingHorizontal: value || focused ? 4 : 0,
+            },
           ]}
         >
           {label}
@@ -218,7 +248,11 @@ function AnimatedField({
         />
 
         {secureTextEntry && (
-          <Pressable onPress={() => setShowPw((v) => !v)} style={styles.eyeBtn} hitSlop={10}>
+          <Pressable
+            onPress={() => setShowPw((v) => !v)}
+            style={styles.eyeBtn}
+            hitSlop={10}
+          >
             <Text style={styles.eyeIcon}>{showPw ? "🙈" : "👁"}</Text>
           </Pressable>
         )}
@@ -233,14 +267,28 @@ function AnimatedField({
 
 // ─── Success overlay ──────────────────────────────────────────────────────────
 
-function SuccessOverlay({ nome, onDone }: { nome: string; onDone: () => void }) {
-  const scale  = useRef(new Animated.Value(0)).current;
+function SuccessOverlay({
+  nome,
+  onDone,
+}: {
+  nome: string;
+  onDone: () => void;
+}) {
+  const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useState(() => {
     Animated.parallel([
-      Animated.spring(scale,  { toValue: 1, useNativeDriver: true, bounciness: 12 }),
-      Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 12,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
     ]).start();
   });
 
@@ -250,12 +298,21 @@ function SuccessOverlay({ nome, onDone }: { nome: string; onDone: () => void }) 
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          <Text style={{ fontWeight: "700" }}>{nome}</Text> já pode fazer login no Sentinela Saúde.
+          <Text style={{ fontWeight: "700" }}>{nome}</Text> já pode fazer login
+          no Sentinela Saúde.
         </Text>
-        <TouchableOpacity style={styles.successBtn} onPress={onDone} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.successBtn}
+          onPress={onDone}
+          activeOpacity={0.85}
+        >
           <Text style={styles.successBtnText}>Concluir</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.successBtnOutline} onPress={() => {}} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.successBtnOutline}
+          onPress={() => {}}
+          activeOpacity={0.8}
+        >
           <Text style={styles.successBtnOutlineText}>Criar outro agente</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -267,51 +324,68 @@ function SuccessOverlay({ nome, onDone }: { nome: string; onDone: () => void }) 
 
 interface FormState {
   nome: string;
-  email: string;
+  cpf: string;
   senha: string;
   confirmarSenha: string;
 }
 
 interface FormErrors {
   nome?: string;
-  email?: string;
+  cpf?: string;
   senha?: string;
   confirmarSenha?: string;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CreateAgentScreen() {
   const { user } = useAuth();
   const ubsId = (user as any)?.ubs_atuante ?? (user as any)?.ubs ?? 0;
 
-  const [cargo, setCargo]   = useState<Cargo>("ACS");
-  const [form, setForm]     = useState<FormState>({ nome: "", email: "", senha: "", confirmarSenha: "" });
+  const [cargo, setCargo] = useState<Cargo>("ACS");
+  const [form, setForm] = useState<FormState>({
+    nome: "",
+    cpf: "",
+    senha: "",
+    confirmarSenha: "",
+  });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({ nome: false, email: false, senha: false, confirmarSenha: false });
+  const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({
+    nome: false,
+    cpf: false,
+    senha: false,
+    confirmarSenha: false,
+  });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   // Refs para navegação entre campos
-  const emailRef    = useRef<TextInput>(null);
-  const senhaRef    = useRef<TextInput>(null);
-  const confirmRef  = useRef<TextInput>(null);
+  const cpfRef = useRef<TextInput>(null);
+  const senhaRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   // ─── Validação ─────────────────────────────────────────────────────────────
 
   function validate(f: FormState): FormErrors {
     const e: FormErrors = {};
-    if (!f.nome.trim())               e.nome = "Nome obrigatório.";
+    if (!f.nome.trim()) e.nome = "Nome obrigatório.";
     else if (f.nome.trim().length < 3) e.nome = "Mínimo 3 caracteres.";
 
-    if (!f.email.trim())              e.email = "E-mail obrigatório.";
-    else if (!EMAIL_RE.test(f.email)) e.email = "E-mail inválido.";
+    if (!f.cpf.trim()) {
+      e.cpf = "CPF obrigatório.";
+    } else {
+      const cpfNumeros = f.cpf.replace(/\D/g, "");
 
-    if (!f.senha)                     e.senha = "Senha obrigatória.";
-    else if (f.senha.length < 6)      e.senha = "Mínimo 6 caracteres.";
+      if (cpfNumeros.length !== 11) {
+        e.cpf = "O CPF deve possuir 11 dígitos.";
+      }
+    }
 
-    if (!f.confirmarSenha)             e.confirmarSenha = "Confirme a senha.";
-    else if (f.confirmarSenha !== f.senha) e.confirmarSenha = "As senhas não coincidem.";
+    if (!f.senha) e.senha = "Senha obrigatória.";
+    else if (f.senha.length < 6) e.senha = "Mínimo 6 caracteres.";
+
+    if (!f.confirmarSenha) e.confirmarSenha = "Confirme a senha.";
+    else if (f.confirmarSenha !== f.senha)
+      e.confirmarSenha = "As senhas não coincidem.";
 
     return e;
   }
@@ -330,7 +404,12 @@ export default function CreateAgentScreen() {
   // ─── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
-    const allTouched = { nome: true, email: true, senha: true, confirmarSenha: true };
+    const allTouched = {
+      nome: true,
+      cpf: true,
+      senha: true,
+      confirmarSenha: true,
+    };
     setTouched(allTouched);
     const errs = validate(form);
     setErrors(errs);
@@ -339,23 +418,31 @@ export default function CreateAgentScreen() {
     setLoading(true);
     try {
       await criarAgente({
-        nome:        form.nome.trim(),
-        email:       form.email.trim().toLowerCase(),
-        senha:       form.senha,
+        nome: form.nome.trim(),
+        cpf: form.cpf.replace(/\D/g, ""),
+        senha: form.senha,
         cargo,
         ubs_atuante: Number(ubsId),
       });
       setSuccess(true);
     } catch (err) {
-      Alert.alert("Erro ao criar conta", err instanceof Error ? err.message : "Tente novamente.");
+      Alert.alert(
+        "Erro ao criar conta",
+        err instanceof Error ? err.message : "Tente novamente.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   function resetForm() {
-    setForm({ nome: "", email: "", senha: "", confirmarSenha: "" });
-    setTouched({ nome: false, email: false, senha: false, confirmarSenha: false });
+    setForm({ nome: "", cpf: "", senha: "", confirmarSenha: "" });
+    setTouched({
+      nome: false,
+      cpf: false,
+      senha: false,
+      confirmarSenha: false,
+    });
     setErrors({});
     setSuccess(false);
   }
@@ -368,7 +455,11 @@ export default function CreateAgentScreen() {
 
       {/* Topbar */}
       <View style={styles.topbar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={12}
+        >
           <View style={styles.backArrow} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -392,7 +483,8 @@ export default function CreateAgentScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.infoEmoji}>ℹ️</Text>
             <Text style={styles.infoText}>
-              A conta criada ficará vinculada à sua Unidade de Saúde. O agente poderá fazer login imediatamente.
+              A conta criada ficará vinculada à sua Unidade de Saúde. O agente
+              poderá fazer login imediatamente.
             </Text>
           </View>
 
@@ -412,20 +504,20 @@ export default function CreateAgentScreen() {
             error={touched.nome ? errors.nome : undefined}
             autoCapitalize="words"
             returnKeyType="next"
-            onSubmitEditing={() => emailRef.current?.focus()}
+            onSubmitEditing={() => cpfRef.current?.focus()}
           />
 
           <AnimatedField
-            label="E-mail institucional"
-            value={form.email}
+            label="CPF"
+            value={form.cpf}
             placeholder=""
-            onChangeText={(v) => handleChange("email", v)}
-            onBlur={() => handleBlur("email")}
-            error={touched.email ? errors.email : undefined}
-            keyboardType="email-address"
+            onChangeText={(v) => handleChange("cpf", v)}
+            onBlur={() => handleBlur("cpf")}
+            error={touched.cpf ? errors.cpf : undefined}
+            keyboardType="default"
             returnKeyType="next"
             onSubmitEditing={() => senhaRef.current?.focus()}
-            inputRef={emailRef}
+            inputRef={cpfRef}
           />
 
           {/* Senha */}
@@ -458,7 +550,7 @@ export default function CreateAgentScreen() {
           />
 
           {/* Resumo do cadastro */}
-          {form.nome && form.email && (
+          {form.nome && form.cpf && (
             <View style={styles.previewCard}>
               <Text style={styles.previewLabel}>Resumo do cadastro</Text>
               <View style={styles.previewRow}>
@@ -467,7 +559,9 @@ export default function CreateAgentScreen() {
               </View>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>E-mail</Text>
-                <Text style={styles.previewVal} numberOfLines={1}>{form.email || "—"}</Text>
+                <Text style={styles.previewVal} numberOfLines={1}>
+                  {form.cpf || "—"}
+                </Text>
               </View>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Cargo</Text>
@@ -518,147 +612,281 @@ const styles = StyleSheet.create({
   // Topbar
   topbar: {
     backgroundColor: Colors.teal600,
-    paddingTop: 52, paddingBottom: Spacing.md,
+    paddingTop: 52,
+    paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    flexDirection: "row", alignItems: "flex-end", gap: Spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: Spacing.md,
   },
   backBtn: {
-    width: 34, height: 34, borderRadius: 17,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 2,
   },
   backArrow: {
-    width: 9, height: 9,
-    borderLeftWidth: 2, borderBottomWidth: 2,
+    width: 9,
+    height: 9,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
     borderColor: Colors.white,
     transform: [{ rotate: "45deg" }, { translateX: 2 }],
   },
-  topbarSub:   { fontSize: FontSize.xs, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
-  topbarTitle: { fontSize: FontSize.lg, fontWeight: "700", color: Colors.white },
+  topbarSub: {
+    fontSize: FontSize.xs,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+  topbarTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.white,
+  },
 
-  scroll:  { flex: 1 },
+  scroll: { flex: 1 },
   content: { padding: Spacing.lg },
 
   // Info card
   infoCard: {
-    flexDirection: "row", gap: Spacing.sm, alignItems: "flex-start",
-    backgroundColor: Colors.teal50, borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.lg,
-    borderLeftWidth: 3, borderLeftColor: Colors.teal400,
+    flexDirection: "row",
+    gap: Spacing.sm,
+    alignItems: "flex-start",
+    backgroundColor: Colors.teal50,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.teal400,
   },
   infoEmoji: { fontSize: 16, flexShrink: 0 },
-  infoText:  { flex: 1, fontSize: FontSize.sm, color: Colors.teal800, lineHeight: 20 },
+  infoText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.teal800,
+    lineHeight: 20,
+  },
 
   // Section label
   sectionLabel: {
-    fontSize: FontSize.xs, fontWeight: "700", color: Colors.gray400,
-    textTransform: "uppercase", letterSpacing: 0.6,
-    marginBottom: Spacing.sm, marginTop: Spacing.sm,
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
   },
 
   // Cargo selector
   cargoContainer: {
-    flexDirection: "row", backgroundColor: Colors.gray100,
-    borderRadius: Radius.sm, padding: 4,
-    marginBottom: Spacing.lg, height: 64,
-    position: "relative", alignItems: "center",
-    borderWidth: 1.5, borderColor: Colors.gray100,
+    flexDirection: "row",
+    backgroundColor: Colors.gray100,
+    borderRadius: Radius.sm,
+    padding: 4,
+    marginBottom: Spacing.lg,
+    height: 64,
+    position: "relative",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: Colors.gray100,
   },
   cargoSlider: {
-    position: "absolute", top: 4, bottom: 4,
-    backgroundColor: Colors.white, borderRadius: Radius.sm - 2,
-    shadowColor: Colors.gray900, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.sm - 2,
+    shadowColor: Colors.gray900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cargoOption: {
-    flex: 1, zIndex: 2,
-    alignItems: "center", justifyContent: "center", gap: 2,
+    flex: 1,
+    zIndex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
   },
-  cargoText:       { fontSize: FontSize.sm, fontWeight: "600", color: Colors.gray400 },
+  cargoText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray400,
+  },
   cargoTextActive: { color: Colors.teal600, fontWeight: "700" },
-  cargoDesc:       { fontSize: 10, color: Colors.gray200 },
+  cargoDesc: { fontSize: 10, color: Colors.gray200 },
   cargoDescActive: { color: Colors.teal400 },
 
   // Animated field
   fieldWrap: { marginBottom: Spacing.lg },
   fieldBox: {
-    borderWidth: 1.5, borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderRadius: Radius.sm,
     backgroundColor: Colors.white,
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: Spacing.md, position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    position: "relative",
   },
   floatingLabel: {
-    position: "absolute", left: Spacing.md,
-    zIndex: 10, fontWeight: "500",
+    position: "absolute",
+    left: Spacing.md,
+    zIndex: 10,
+    fontWeight: "500",
   },
   fieldInput: {
-    flex: 1, paddingVertical: Platform.OS === "ios" ? 14 : 12,
-    fontSize: FontSize.base, color: Colors.gray900,
+    flex: 1,
+    paddingVertical: Platform.OS === "ios" ? 14 : 12,
+    fontSize: FontSize.base,
+    color: Colors.gray900,
   },
-  fieldError: { fontSize: FontSize.xs, color: Colors.red400, marginTop: 4, marginLeft: 2 },
-  eyeBtn:     { padding: Spacing.sm },
-  eyeIcon:    { fontSize: 16 },
+  fieldError: {
+    fontSize: FontSize.xs,
+    color: Colors.red400,
+    marginTop: 4,
+    marginLeft: 2,
+  },
+  eyeBtn: { padding: Spacing.sm },
+  eyeIcon: { fontSize: 16 },
 
   // Preview card
   previewCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.lg,
-    borderWidth: 1, borderColor: "rgba(15,110,86,0.1)",
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.1)",
     gap: Spacing.sm,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   previewLabel: {
-    fontSize: FontSize.xs, fontWeight: "700", color: Colors.gray400,
-    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2,
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  previewRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  previewKey:  { fontSize: FontSize.sm, color: Colors.gray400 },
-  previewVal:  { fontSize: FontSize.sm, fontWeight: "500", color: Colors.gray900, flex: 1, textAlign: "right" },
-  cargoPill:   { backgroundColor: Colors.teal50, borderRadius: 20, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
+  previewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  previewKey: { fontSize: FontSize.sm, color: Colors.gray400 },
+  previewVal: {
+    fontSize: FontSize.sm,
+    fontWeight: "500",
+    color: Colors.gray900,
+    flex: 1,
+    textAlign: "right",
+  },
+  cargoPill: {
+    backgroundColor: Colors.teal50,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
   cargoPillText: { fontSize: 11, fontWeight: "700", color: Colors.teal800 },
 
   // Submit button
   submitBtn: {
-    backgroundColor: Colors.teal600, borderRadius: Radius.sm,
-    paddingVertical: 15, alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.teal600,
+    borderRadius: Radius.sm,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: 52,
-    shadowColor: Colors.teal800, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 8, elevation: 5,
+    shadowColor: Colors.teal800,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   submitBtnDisabled: { opacity: 0.65 },
-  submitBtnText: { fontSize: FontSize.md, fontWeight: "700", color: Colors.white, letterSpacing: 0.2 },
+  submitBtnText: {
+    fontSize: FontSize.md,
+    fontWeight: "700",
+    color: Colors.white,
+    letterSpacing: 0.2,
+  },
 
   // Success overlay
   successOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(4,52,44,0.55)",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     padding: Spacing.xl,
   },
   successBox: {
-    backgroundColor: Colors.white, borderRadius: 24,
-    padding: Spacing.xl, alignItems: "center", gap: Spacing.md, width: "100%",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2, shadowRadius: 24, elevation: 16,
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.md,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 16,
   },
   successEmoji: {
-    fontSize: 40, width: 80, height: 80, textAlign: "center", lineHeight: 80,
-    backgroundColor: Colors.teal50, borderRadius: 40,
-    color: Colors.teal600, fontWeight: "700",
+    fontSize: 40,
+    width: 80,
+    height: 80,
+    textAlign: "center",
+    lineHeight: 80,
+    backgroundColor: Colors.teal50,
+    borderRadius: 40,
+    color: Colors.teal600,
+    fontWeight: "700",
     overflow: "hidden",
   },
-  successTitle: { fontSize: FontSize.xl, fontWeight: "700", color: Colors.gray900 },
-  successSub:   { fontSize: FontSize.sm, color: Colors.gray400, textAlign: "center", lineHeight: 22 },
+  successTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: "700",
+    color: Colors.gray900,
+  },
+  successSub: {
+    fontSize: FontSize.sm,
+    color: Colors.gray400,
+    textAlign: "center",
+    lineHeight: 22,
+  },
   successBtn: {
-    width: "100%", backgroundColor: Colors.teal600,
-    borderRadius: Radius.sm, paddingVertical: 14, alignItems: "center",
+    width: "100%",
+    backgroundColor: Colors.teal600,
+    borderRadius: Radius.sm,
+    paddingVertical: 14,
+    alignItems: "center",
   },
-  successBtnText: { fontSize: FontSize.base, fontWeight: "700", color: Colors.white },
+  successBtnText: {
+    fontSize: FontSize.base,
+    fontWeight: "700",
+    color: Colors.white,
+  },
   successBtnOutline: {
-    width: "100%", borderWidth: 1.5, borderColor: Colors.teal600,
-    borderRadius: Radius.sm, paddingVertical: 13, alignItems: "center",
+    width: "100%",
+    borderWidth: 1.5,
+    borderColor: Colors.teal600,
+    borderRadius: Radius.sm,
+    paddingVertical: 13,
+    alignItems: "center",
   },
-  successBtnOutlineText: { fontSize: FontSize.base, fontWeight: "600", color: Colors.teal600 },
+  successBtnOutlineText: {
+    fontSize: FontSize.base,
+    fontWeight: "600",
+    color: Colors.teal600,
+  },
 });

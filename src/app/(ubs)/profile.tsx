@@ -104,7 +104,7 @@ export default function UbsProfileScreen() {
           <Text style={styles.sectionLabel}>Informações da unidade</Text>
           <InfoRow label="Unidade" value={nomeUBS || "—"} />
           <InfoRow label="Município" value={ubs?.municipio ?? "—"} />
-          <InfoRow label="E-mail" value={ubs?.email ?? "—"} />
+          <InfoRow label="CPF do usuário" value={ubs?.cpf ?? "—"} />
         </View>
 
         {/* Configurações */}
