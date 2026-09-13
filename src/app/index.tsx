@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 // ─── Ícone SVG inline — círculo + ponteiro de relógio (logo sentinela) ───────
 function SentinelaLogo() {
   return (
@@ -33,8 +34,8 @@ function SentinelaLogo() {
 }
 
 interface RoleSelectorProps {
-  selectedRole: "ACS/ACE" | "UBS" | "CM" | "";
-  onChangeRole: (role: "ACS/ACE" | "UBS" | "CM") => void;
+  selectedRole: "ACS/ACE" | "UBS" | "CM" | "VR" | "";
+  onChangeRole: (role: "ACS/ACE" | "UBS" | "CM" | "VR") => void;
   hasError?: boolean;
 }
 
@@ -53,6 +54,14 @@ function RoleSelector({
   const fadeACS = useRef(new Animated.Value(0.6)).current;
   const fadeUBS = useRef(new Animated.Value(0.6)).current;
   const fadeCM = useRef(new Animated.Value(0.6)).current;
+  const scaleVR = useRef(new Animated.Value(1)).current;
+  const fadeVR = useRef(new Animated.Value(0.6)).current;
+
+  Animated.timing(fadeVR, {
+    toValue: selectedRole === "VR" ? 1 : 0.6,
+    duration: 200,
+    useNativeDriver: true,
+  }).start();
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
@@ -62,8 +71,7 @@ function RoleSelector({
     if (containerWidth === 0) return;
 
     // Se não houver nada selecionado (""), deixa o indicador escondido ou na esquerda invisível
-    const optionWidth = containerWidth / 3;
-
+    const optionWidth = containerWidth / 4;
     const targetValue =
       selectedRole === "ACS/ACE"
         ? 0
@@ -71,7 +79,9 @@ function RoleSelector({
           ? optionWidth
           : selectedRole === "CM"
             ? optionWidth * 2
-            : 0;
+            : selectedRole === "VR"
+              ? optionWidth * 3
+              : 0;
 
     Animated.spring(sliderAnim, {
       toValue: targetValue,
@@ -99,18 +109,24 @@ function RoleSelector({
     }).start();
   }, [selectedRole, containerWidth]);
 
-  const onPressIn = (role: "ACS/ACE" | "UBS" | "CM") => {
+  const onPressIn = (role: "ACS/ACE" | "UBS" | "CM" | "VR") => {
     const scale =
-      role === "ACS/ACE" ? scaleACS : role === "UBS" ? scaleUBS : scaleCM;
+      role === "ACS/ACE"
+        ? scaleACS
+        : role === "UBS"
+          ? scaleUBS
+          : role === "CM"
+            ? scaleCM
+            : scaleVR;
 
     Animated.timing(scale, {
-      toValue: 0.95,
+      toValue: 1,
       duration: 100,
       useNativeDriver: true,
     }).start();
   };
 
-  const onPressOut = (role: "ACS/ACE" | "UBS" | "CM") => {
+  const onPressOut = (role: "ACS/ACE" | "UBS" | "CM" | "VR") => {
     const scale =
       role === "ACS/ACE" ? scaleACS : role === "UBS" ? scaleUBS : scaleCM;
 
@@ -121,12 +137,13 @@ function RoleSelector({
     }).start();
   };
 
-  const sliderWidth = containerWidth ? containerWidth / 3 - 4 : 0;
+  const sliderWidth = containerWidth ? containerWidth / 4 - 4 : 0;
 
   const showIndicator =
     selectedRole === "ACS/ACE" ||
     selectedRole === "UBS" ||
-    selectedRole === "CM";
+    selectedRole === "CM" ||
+    selectedRole === "VR";
 
   return (
     <View
@@ -241,6 +258,39 @@ function RoleSelector({
           </Text>
         </Animated.View>
       </Pressable>
+      <Pressable
+        onPressIn={() => onPressIn("VR")}
+        onPressOut={() => onPressOut("VR")}
+        onPress={() => onChangeRole("VR")}
+        style={styles.selectorOption}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: selectedRole === "VR" }}
+      >
+        <Animated.View
+          style={[
+            styles.optionContent,
+            {
+              transform: [{ scale: scaleVR }],
+              opacity: fadeVR,
+            },
+          ]}
+        >
+          <Feather
+            name="map"
+            size={16}
+            color={selectedRole === "VR" ? Colors.teal600 : Colors.gray400}
+          />
+
+          <Text
+            style={[
+              styles.selectorText,
+              selectedRole === "VR" && styles.selectorTextActive,
+            ]}
+          >
+            Vig. Regional
+          </Text>
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }
@@ -340,6 +390,7 @@ export default function LoginScreen() {
   const { form, errors, touched, handleChange, handleBlur, validateAll } =
     useLoginForm();
 
+  const [superintendencia, setSuperintendencia] = useState("");
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -402,6 +453,8 @@ export default function LoginScreen() {
         router.replace("/(ubs)");
       } else if (form.tipo_login === "CM") {
         router.replace("/(cm)");
+      } else if (form.tipo_login === "VR") {
+        router.replace("/(regional)");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao autenticar.";
@@ -495,7 +548,6 @@ export default function LoginScreen() {
               onSubmitEditing={handleSubmit}
               inputRef={senhaRef}
             />
-
             {/* Erro da API */}
             {apiError && (
               <View style={styles.apiErrorBox}>
@@ -568,6 +620,37 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: Spacing.xl,
+  },
+  superintendenciaSection: {
+    marginBottom: Spacing.md,
+  },
+
+  superintendenciaOptions: {
+    gap: Spacing.sm,
+  },
+
+  superintendenciaOption: {
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    borderRadius: Radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.white,
+  },
+
+  superintendenciaOptionSelected: {
+    borderColor: Colors.teal600,
+    backgroundColor: "rgba(15,110,86,0.08)",
+  },
+
+  superintendenciaOptionText: {
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+  },
+
+  superintendenciaOptionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
   },
   logoIconWrap: {
     width: 72,

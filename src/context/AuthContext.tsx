@@ -7,16 +7,9 @@ import React, {
 } from "react";
 
 import { AuthUser, LoginPayload } from "@/types";
-import {
-  loginRequest,
-  buildUserFromToken,
-} from "@/services/authService";
+import { loginRequest, buildUserFromToken } from "@/services/authService";
 
-import {
-  deleteItem,
-  getItem,
-  saveItem,
-} from "@/utils/storage";
+import { deleteItem, getItem, saveItem } from "@/utils/storage";
 
 const TOKEN_KEY = "sentinela_token";
 const USER_KEY = "sentinela_user";
@@ -25,17 +18,13 @@ interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (payload: LoginPayload) => Promise<void>;
+  signIn: (payload: LoginPayload, superintendencia?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,50 +66,60 @@ export function AuthProvider({
     })();
   }, []);
 
-  const signIn = useCallback(async (payload: LoginPayload) => {
-  const { access_token, usuario } = await loginRequest(payload);
+  const signIn = useCallback(
+    async (payload: LoginPayload, superintendencia?: string) => {
+      const { access_token, usuario } = await loginRequest(payload);
 
-  const me = buildUserFromToken(access_token);
+      const me = buildUserFromToken(access_token);
 
-  let fullUser: AuthUser;
+      let fullUser: AuthUser;
 
-  if (me.role === "agente") {
-    fullUser = {
-      ...me,
-      id: usuario.id,
-      nome: usuario.nome,
-      cpf: usuario.cpf,
-      cargo: usuario.cargo ?? "",
-    };
-  } else if (me.role === "ubs") {
-    fullUser = {
-      ...me,
-      id: usuario.id,
-      nome: usuario.nome,
-      cpf: usuario.cpf,
-      ubs: usuario.ubs ?? 0,
-      municipio: usuario.municipio ?? "",
-    };
-  } else if (me.role === "cm") {
-    fullUser = {
-      ...me,
-      id: usuario.id,
-      nome: usuario.nome,
-      cpf: usuario.cpf,
-      cargo: "Coordenador Municipal",
-      municipio: usuario.municipio ?? "",
-    };
-  } else {
-    throw new Error("Papel de usuário desconhecido.");
-  }
+      if (me.role === "agente") {
+        fullUser = {
+          ...me,
+          id: usuario.id,
+          nome: usuario.nome,
+          cpf: usuario.cpf,
+          cargo: usuario.cargo ?? "",
+        };
+      } else if (me.role === "ubs") {
+        fullUser = {
+          ...me,
+          id: usuario.id,
+          nome: usuario.nome,
+          cpf: usuario.cpf,
+          ubs: usuario.ubs ?? 0,
+          municipio: usuario.municipio ?? "",
+        };
+      } else if (me.role === "cm") {
+        fullUser = {
+          ...me,
+          id: usuario.id,
+          nome: usuario.nome,
+          cpf: usuario.cpf,
+          cargo: "Coordenador Municipal",
+          municipio: usuario.municipio ?? "",
+        };
+      } else if (me.role === "vr") {
+        fullUser = {
+          ...me,
+          id: usuario.id,
+          nome: usuario.nome,
+          cpf: usuario.cpf,
+          superintendencia: usuario.superintendencia ?? 0,
+        };
+      } else {
+        throw new Error("Papel de usuário desconhecido.");
+      }
 
-  await saveItem(TOKEN_KEY, access_token);
-  await saveItem(USER_KEY, JSON.stringify(fullUser));
+      await saveItem(TOKEN_KEY, access_token);
+      await saveItem(USER_KEY, JSON.stringify(fullUser));
 
-  setToken(access_token);
-  setUser(fullUser);
-}, []);
-
+      setToken(access_token);
+      setUser(fullUser);
+    },
+    [],
+  );
 
   const signOut = useCallback(async () => {
     try {
@@ -153,9 +152,7 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
 
   if (!ctx) {
-    throw new Error(
-      "useAuth deve ser usado dentro de <AuthProvider>"
-    );
+    throw new Error("useAuth deve ser usado dentro de <AuthProvider>");
   }
 
   return ctx;

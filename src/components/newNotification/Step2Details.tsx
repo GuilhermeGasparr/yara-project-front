@@ -4,14 +4,17 @@ import { PickerField, SegmentedPicker, TextField } from "./FormField";
 import { WizardNavButtons } from "./WizardNavButtons";
 import {
   CONTINUIDADE_OPTIONS,
-  ESTADOS_BRASIL,
   LOCAIS_OCORRENCIA,
   MEIOS_IDENTIFICACAO,
   MUNICIPIOS_CEARA,
   TIPOS_POR_CATEGORIA,
   WizardData,
 } from "./constants";
-
+import DatePickerField from "@/components/DatePickerField";
+import { TouchableOpacity } from "react-native";
+import { useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
+import DateTimePicker from "@react-native-community/datetimepicker";
 interface Props {
   data: WizardData;
   onChange: (d: Partial<WizardData>) => void;
@@ -22,7 +25,8 @@ interface Props {
 export function Step2Detalhes({ data, onChange, onNext, onBack }: Props) {
   const tipos = data.categoria ? TIPOS_POR_CATEGORIA[data.categoria] : [];
   const categoriaLabel = data.categoria ?? "";
-
+  const [dataAproximada, setDataAproximada] = useState<Date | null>(null);
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const labelAfetados =
     data.categoria === "EPIZOOTIA"
       ? "Nº estimado de animais afetados"
@@ -60,18 +64,6 @@ export function Step2Detalhes({ data, onChange, onNext, onBack }: Props) {
         onChangeText={(v) => onChange({ endereco: v })}
         placeholder="Rua, número, bairro..."
       />
-      <PickerField
-        label="Estado"
-        options={ESTADOS_BRASIL}
-        value={data.estado}
-        onSelect={(v) =>
-          onChange({
-            estado: v,
-            municipio: "",
-          })
-        }
-        placeholder="Selecione o estado..."
-      />
 
       <PickerField
         label="Município"
@@ -84,14 +76,13 @@ export function Step2Detalhes({ data, onChange, onNext, onBack }: Props) {
             : "Selecione primeiro o Ceará..."
         }
       />
-      <TextField
-        label="Data aproximada"
-        value={data.data_aproximada}
-        onChangeText={(v) => onChange({ data_aproximada: v })}
-        placeholder="Ex: 10/06/2025"
-        keyboardType="default"
-      />
 
+      <Text style={styles.label}>Data Aproximada</Text>
+      <DatePickerField
+        value={data.data_aproximada}
+        onChange={(date) => onChange({ data_aproximada: date })}
+        placeholder="Selecione uma data aproximada"
+      />
       <TextField
         label={labelAfetados}
         value={data.pessoas_animais}
@@ -147,5 +138,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: Spacing.lg,
     overflow: "hidden",
+  },
+  dateInput: {
+    height: 40,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#D9E7E3",
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  label: {
+    fontSize: FontSize.xs,
+    fontWeight: "600",
+    color: Colors.gray600,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  dateText: {
+    fontSize: 14,
+    color: "#17211E",
+  },
+
+  placeholder: {
+    color: "#9CA3AF",
   },
 });

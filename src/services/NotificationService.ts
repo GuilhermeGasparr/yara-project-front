@@ -1,6 +1,7 @@
 import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
-const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -22,9 +23,11 @@ export interface Notificacao {
   data_envio: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
-  endereco?: string; // <--- ADICIONADO
-  latitude?: number; // <--- ADICIONADO
-  longitude?: number; // <--- ADICIONADO
+  municipio?: string;
+  estado?: string;
+  endereco?: string;
+  latitude?: number;
+  longitude?: number;
   continuidade_situacao: string;
   descricao: string;
   acs_ace_id: number;

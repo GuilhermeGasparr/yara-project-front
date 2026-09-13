@@ -20,10 +20,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { getItem } from "@/utils/storage";
 
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://yara-project.onrender.com";
-
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 async function criarAgente(payload: {
   nome: string;
   cpf: string;
