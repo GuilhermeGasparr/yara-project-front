@@ -1,6 +1,7 @@
 import { LoginPayload, LoginResponse, AuthUser } from "@/types";
 
-const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 const BASE_HEADERS: Record<string, string> = {
   "ngrok-skip-browser-warning": "true",
@@ -72,7 +73,15 @@ export function buildUserFromToken(
       municipio: (extras?.["municipio"] as string) ?? "",
     };
   }
-
+  if (tipo === "VR") {
+    return {
+      role: "vr",
+      id,
+      nome: (extras?.["nome"] as string) ?? "",
+      cpf: (extras?.["cpf"] as string) ?? "",
+      superintendencia: (extras?.["superintendencia"] as number) ?? 0,
+    };
+  }
   throw new Error(`Tipo de usuário desconhecido: ${tipo}`);
 }
 

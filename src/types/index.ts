@@ -1,4 +1,4 @@
-export type UserRole = "agente" | "ubs" | "cm";
+export type UserRole = "agente" | "ubs" | "cm" | "vr";
 
 export interface AgenteUser {
   role: "agente";
@@ -27,12 +27,19 @@ export interface CMUser {
   municipio: string;
 }
 
-export type AuthUser = AgenteUser | UBSUser | CMUser;
+export interface VRUser {
+  role: "vr";
+  id: number;
+  nome: string;
+  cpf: string;
+  superintendencia: number;
+}
+export type AuthUser = AgenteUser | UBSUser | CMUser | VRUser;
 
 export interface LoginPayload {
   cpf: string;
   senha: string;
-  tipo_login?: "ACS/ACE" | "UBS" | "CM";
+  tipo_login?: "ACS/ACE" | "UBS" | "CM" | "VR";
 }
 
 export interface LoginUsuario {
@@ -43,6 +50,7 @@ export interface LoginUsuario {
   ubs?: number;
   ubs_atuante?: number;
   municipio?: string;
+  superintendencia?: number;
 }
 
 export interface LoginResponse {
