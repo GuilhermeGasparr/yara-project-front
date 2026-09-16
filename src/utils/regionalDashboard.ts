@@ -18,7 +18,7 @@ export interface StatusResumo {
 export interface RegionalDashboardData {
   total: number;
   emInvestigacao: number;
-  confirmadas: number;
+  veridicos: number;
   municipiosAtivos: number;
   porMunicipio: MunicipioResumo[];
   municipiosEmInvestigacao: string[];
@@ -61,9 +61,10 @@ export function gerarDashboardRegional(
     (notificacao) => normalizar(notificacao.status) === "EM INVESTIGACAO",
   ).length;
 
-  const confirmadas = notificacoes.filter(
-    (notificacao) => normalizar(notificacao.status) === "CONFIRMADO",
+  const veridicos = notificacoes.filter(
+    (notificacao) => normalizar(notificacao.status) === "VERIDICO",
   ).length;
+
   const municipiosEmInvestigacao = Array.from(
     new Set(
       notificacoes
@@ -76,13 +77,12 @@ export function gerarDashboardRegional(
 
   return {
     total: notificacoes.length,
-
     emInvestigacao,
-
-    confirmadas,
-
+    veridicos,
     municipiosAtivos: Object.keys(porMunicipio).length,
+
     municipiosEmInvestigacao,
+
     porMunicipio: Object.entries(porMunicipio)
       .map(([municipio, quantidade]) => ({
         municipio,

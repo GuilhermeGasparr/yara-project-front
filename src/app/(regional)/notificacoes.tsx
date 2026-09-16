@@ -73,16 +73,16 @@ export default function RegionalNotificationsScreen() {
   // ─── Filtros ──────────────────────────────────────────────────────────────
 
   const notificacoesFiltradas = notificacoes.filter((item) => {
-  if (filtro === "Todos") {
-    return true;
-  }
+    if (filtro === "Todos") {
+      return true;
+    }
 
-  if (filtro === "EM INVESTIGAÇÃO") {
-    return normalizar(item.status) === "EM INVESTIGACAO";
-  }
+    if (filtro === "EM INVESTIGAÇÃO") {
+      return normalizar(item.status) === "EM INVESTIGACAO";
+    }
 
-  return normalizar(item.categoria) === normalizar(filtro);
-});
+    return normalizar(item.categoria) === normalizar(filtro);
+  });
 
   // ─── Card ──────────────────────────────────────────────────────────────────
 
@@ -504,7 +504,13 @@ function formatarDataCompleta(data: string) {
 }
 
 function formatarAfetados(quantidade: number, categoria: string) {
-  if (categoria === "EPIZOOTIA") {
+  const categoriaNormalizada = categoria
+    ?.trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (categoriaNormalizada === "EPIZOOTIA") {
     return `${quantidade} animais afetados`;
   }
 
@@ -541,20 +547,17 @@ function formatarFiltro(filtro: string) {
 
 function formatarStatus(status: string) {
   switch (status) {
+    case "EM ANDAMENTO":
+      return "Pendente";
+
     case "EM INVESTIGAÇÃO":
       return "Em investigação";
 
-    case "EM ANDAMENTO":
-      return "Em andamento";
+    case "VERÍDICO":
+      return "Verídico";
 
-    case "RECEBIDO":
-      return "Recebido";
-
-    case "CONFIRMADO":
-      return "Confirmado";
-
-    case "DESCARTADO":
-      return "Descartado";
+    case "NÃO VERÍDICO":
+      return "Não verídico";
 
     case "ENCERRADO":
       return "Encerrado";
@@ -565,8 +568,14 @@ function formatarStatus(status: string) {
 }
 
 function getCategoriaStyle(categoria: string) {
-  switch (categoria) {
-    case "DOENÇA":
+  const categoriaNormalizada = categoria
+    ?.trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  switch (categoriaNormalizada) {
+    case "DOENCA":
       return {
         backgroundColor: "#FDE8E8",
         color: "#C62828",
@@ -594,40 +603,34 @@ function getCategoriaStyle(categoria: string) {
 
 function getStatusStyle(status: string) {
   switch (status) {
-    case "EM INVESTIGAÇÃO":
-      return {
-        backgroundColor: "#FFF0D8",
-        color: "#A15C00",
-      };
-
-    case "RECEBIDO":
-      return {
-        backgroundColor: "#E4F0FD",
-        color: "#1261A0",
-      };
-
-    case "ENCERRADO":
-      return {
-        backgroundColor: "#F0EEE9",
-        color: "#77736A",
-      };
-
-    case "CONFIRMADO":
-      return {
-        backgroundColor: "#DDF3EC",
-        color: "#007C68",
-      };
-
     case "EM ANDAMENTO":
       return {
         backgroundColor: "#E4F0FD",
         color: "#1261A0",
       };
 
-    case "DESCARTADO":
+    case "EM INVESTIGAÇÃO":
+      return {
+        backgroundColor: "#FFF0D8",
+        color: "#A15C00",
+      };
+
+    case "VERÍDICO":
+      return {
+        backgroundColor: "#DDF3EC",
+        color: "#007C68",
+      };
+
+    case "NÃO VERÍDICO":
       return {
         backgroundColor: "#FDE8E8",
         color: "#C62828",
+      };
+
+    case "ENCERRADO":
+      return {
+        backgroundColor: "#F0EEE9",
+        color: "#77736A",
       };
 
     default:

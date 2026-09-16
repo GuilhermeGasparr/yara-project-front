@@ -22,11 +22,10 @@ import {
   DashboardStats,
   listarNotificacoesCM,
   NotificacaoCM,
-  setConfirmado,
-  setDescartado,
   setEmInvestigacao,
   setEncerrado,
-  setRecebido,
+  setNaoVeridico,
+  setVeridico,
   StatusCM,
 } from "@/services/CmService";
 import { Feather } from "@expo/vector-icons";
@@ -34,26 +33,35 @@ import { Feather } from "@expo/vector-icons";
 
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
   {
-    RECEBIDO: { label: "Recebido", bg: "#E6F1FB", color: "#0C447C" },
+    "EM ANDAMENTO": {
+      label: "Pendente",
+      bg: "#E4F0FD",
+      color: "#1261A0",
+    },
+
     "EM INVESTIGAÇÃO": {
       label: "Em investigação",
       bg: "#FAEEDA",
       color: "#854F0B",
     },
-    CONFIRMADO: {
-      label: "Confirmado",
+
+    VERÍDICO: {
+      label: "Verídico",
       bg: Colors.teal50,
       color: Colors.teal800,
     },
-    DESCARTADO: {
-      label: "Descartado",
+
+    "NÃO VERÍDICO": {
+      label: "Não verídico",
+      bg: "#FDE8E8",
+      color: "#C62828",
+    },
+
+    ENCERRADO: {
+      label: "Encerrado",
       bg: Colors.gray50,
       color: Colors.gray600,
     },
-    ENCERRADO: { label: "Encerrado", bg: Colors.gray50, color: Colors.gray400 },
-    VALIDADA: { label: "Validada", bg: Colors.teal50, color: Colors.teal600 },
-    ENCAMINHADA: { label: "Encaminhada", bg: "#E6F1FB", color: "#185FA5" },
-    "EM ANDAMENTO": { label: "Em andamento", bg: "#FAEEDA", color: "#854F0B" },
   };
 
 const CATEGORIA_COLOR: Record<string, string> = {
@@ -64,10 +72,10 @@ const CATEGORIA_COLOR: Record<string, string> = {
 
 const FILTROS = [
   "TODOS",
-  "RECEBIDO",
+  "EM ANDAMENTO",
   "EM INVESTIGAÇÃO",
-  "CONFIRMADO",
-  "DESCARTADO",
+  "VERÍDICO",
+  "NÃO VERÍDICO",
   "ENCERRADO",
 ];
 
@@ -101,8 +109,8 @@ function DetailModal({
   onStatusChange,
   loadingId,
 }: DetailModalProps) {
-  if (!notif) return null;
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+  if (!notif) return null;
 
   async function handleBaixarRelatorio() {
     if (!notif) return;
@@ -160,8 +168,8 @@ function DetailModal({
     color: string;
   }[] = [
     {
-      label: "✓ Confirmado",
-      status: "CONFIRMADO",
+      label: "✓ Verídico",
+      status: "VERÍDICO",
       bg: Colors.teal50,
       border: Colors.teal100,
       color: Colors.teal800,
@@ -174,18 +182,18 @@ function DetailModal({
       color: "#854F0B",
     },
     {
-      label: "✗ Descartado",
-      status: "DESCARTADO",
-      bg: Colors.gray50,
-      border: Colors.gray100,
-      color: Colors.gray600,
+      label: "✗ Não verídico",
+      status: "NÃO VERÍDICO",
+      bg: "#FDE8E8",
+      border: "#F7C1C1",
+      color: "#C62828",
     },
     {
       label: "■ Encerrado",
       status: "ENCERRADO",
-      bg: "#FCEBEB",
-      border: "#F7C1C1",
-      color: Colors.red600,
+      bg: "#F0EEE9",
+      border: "#D9D5CC",
+      color: Colors.gray600,
     },
   ];
 
@@ -389,7 +397,7 @@ export default function CMScreen() {
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     em_investigacao: 0,
-    confirmados: 0,
+    veridicos: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -446,8 +454,7 @@ export default function CMScreen() {
 
   const notifFiltradas = useMemo(() => {
     if (filtro === "TODOS") return notificacoes;
-    // "RECEBIDO" no filtro mostra TODAS que chegaram (qualquer status)
-    if (filtro === "RECEBIDO") return notificacoes;
+
     return notificacoes.filter((n) => n.status === filtro);
   }, [notificacoes, filtro]);
 
@@ -460,14 +467,11 @@ export default function CMScreen() {
         StatusCM,
         ((id: number) => Promise<void>) | undefined
       > = {
-        RECEBIDO: setRecebido,
-        "EM INVESTIGAÇÃO": setEmInvestigacao,
-        CONFIRMADO: setConfirmado,
-        DESCARTADO: setDescartado,
-        ENCERRADO: setEncerrado,
-        VALIDADA: undefined,
-        ENCAMINHADA: undefined,
         "EM ANDAMENTO": undefined,
+        "EM INVESTIGAÇÃO": setEmInvestigacao,
+        VERÍDICO: setVeridico,
+        "NÃO VERÍDICO": setNaoVeridico,
+        ENCERRADO: setEncerrado,
       };
       const fn = fnMap[novoStatus];
       if (!fn) return;
@@ -522,7 +526,6 @@ export default function CMScreen() {
         </View>
 
         {/* Download do relatório */}
-      
 
         {/* Perfil */}
         <TouchableOpacity
@@ -561,9 +564,9 @@ export default function CMScreen() {
           </View>
           <View style={s.statCard}>
             <Text style={[s.statNum, { color: Colors.teal600 }]}>
-              {stats.confirmados}
+              {stats.veridicos}
             </Text>
-            <Text style={s.statLbl}>Confirmados</Text>
+            <Text style={s.statLbl}>Verídicas</Text>
           </View>
         </View>
 
@@ -811,13 +814,13 @@ const s = StyleSheet.create({
     marginLeft: 20,
   },
   downloadModalBtn: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
-  alignItems: "center",
-  justifyContent: "center",
-  marginLeft: Spacing.sm,
-},
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: Spacing.sm,
+  },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",

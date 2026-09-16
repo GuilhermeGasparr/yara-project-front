@@ -23,19 +23,12 @@ import NotificationsByCategory from "@/components/regional/NotificationsByCatego
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 // ─── Configuração de status ──────────────────────────────────────────────────
-
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
   {
     "EM ANDAMENTO": {
-      label: "Em andamento",
-      bg: "#FAEEDA",
-      color: "#854F0B",
-    },
-
-    RECEBIDO: {
-      label: "Recebido",
-      bg: "#E6F1FB",
-      color: "#0C447C",
+      label: "Pendente",
+      bg: "#E4F0FD",
+      color: "#1261A0",
     },
 
     "EM INVESTIGAÇÃO": {
@@ -44,25 +37,24 @@ const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
       color: "#854F0B",
     },
 
-    CONFIRMADO: {
-      label: "Confirmado",
+    VERÍDICO: {
+      label: "Verídico",
       bg: Colors.teal50,
       color: Colors.teal800,
     },
 
-    DESCARTADO: {
-      label: "Descartado",
-      bg: Colors.gray50,
-      color: Colors.gray600,
+    "NÃO VERÍDICO": {
+      label: "Não verídico",
+      bg: "#FDE8E8",
+      color: "#C62828",
     },
 
     ENCERRADO: {
       label: "Encerrado",
       bg: Colors.gray50,
-      color: Colors.gray400,
+      color: Colors.gray600,
     },
   };
-
 // ─── Componentes ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -337,20 +329,6 @@ export default function RegionalHomeScreen() {
     carregarNotificacoes();
   }, [carregarNotificacoes]);
 
-  // ─── Estatísticas calculadas a partir da API ───────────────────────────────
-
-  const stats = useMemo(() => {
-    return {
-      total: notificacoes.length,
-
-      investigacao: notificacoes.filter(
-        (item) => item.status === "EM INVESTIGAÇÃO",
-      ).length,
-
-      confirmadas: notificacoes.filter((item) => item.status === "CONFIRMADO")
-        .length,
-    };
-  }, [notificacoes]);
 
   // ─── Últimas notificações ─────────────────────────────────────────────────
 
@@ -425,7 +403,7 @@ export default function RegionalHomeScreen() {
         <RegionalOverview
           total={dashboard.total}
           emInvestigacao={dashboard.emInvestigacao}
-          confirmadas={dashboard.confirmadas}
+          veridicos={dashboard.veridicos}
           municipiosAtivos={dashboard.municipiosAtivos}
         />
         <RegionalAlert

@@ -7,10 +7,9 @@ const BASE_URL = "http://localhost:8000";
 
 export type NotificacaoStatus =
   | "EM ANDAMENTO"
-  | "RECEBIDO"
   | "EM INVESTIGAÇÃO"
-  | "CONFIRMADO"
-  | "DESCARTADO"
+  | "VERÍDICO"
+  | "NÃO VERÍDICO"
   | "ENCERRADO";
 
 export type Categoria = "DOENÇA" | "EPIZOOTIA" | "DESASTRE";

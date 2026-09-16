@@ -6,14 +6,14 @@ import RegionalStatCard from "./RegionalStatCard";
 interface RegionalOverviewProps {
   total: number;
   emInvestigacao: number;
-  confirmadas: number;
+  veridicos: number;
   municipiosAtivos: number;
 }
 
 export default function RegionalOverview({
   total,
   emInvestigacao,
-  confirmadas,
+  veridicos,
   municipiosAtivos,
 }: RegionalOverviewProps) {
   return (
@@ -21,11 +21,7 @@ export default function RegionalOverview({
       <Text style={styles.title}>Visão geral da Regional</Text>
 
       <View style={styles.row}>
-        <RegionalStatCard
-          title="Notificações"
-          value={total}
-          icon="bell"
-        />
+        <RegionalStatCard title="Notificações" value={total} icon="bell" />
 
         <RegionalStatCard
           title="Em investigação"
@@ -36,8 +32,8 @@ export default function RegionalOverview({
 
       <View style={styles.row}>
         <RegionalStatCard
-          title="Confirmadas"
-          value={confirmadas}
+          title="Verídicas"
+          value={veridicos}
           icon="check-circle"
         />
 

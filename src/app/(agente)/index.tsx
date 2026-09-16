@@ -27,7 +27,8 @@ import {
 function getSaudacao() {
   const h = new Date().getHours();
   if (h < 12) return "Bom dia,";
-  if (h < 18) return "Boa tarde,";  return "Boa noite,";
+  if (h < 18) return "Boa tarde,";
+  return "Boa noite,";
 }
 
 function contarStatus(list: Notificacao[], status: NotificacaoStatus) {
@@ -175,8 +176,11 @@ export default function AgenteHomeScreen() {
   const stats = useMemo(
     () => ({
       total: notificacoes.length,
+      pendentes: contarStatus(notificacoes, "EM ANDAMENTO"),
       investigacao: contarStatus(notificacoes, "EM INVESTIGAÇÃO"),
-      confirmados: contarStatus(notificacoes, "CONFIRMADO"),
+      veridicos: contarStatus(notificacoes, "VERÍDICO"),
+      naoVeridicos: contarStatus(notificacoes, "NÃO VERÍDICO"),
+      encerradas: contarStatus(notificacoes, "ENCERRADO"),
     }),
     [notificacoes],
   );
@@ -191,10 +195,6 @@ export default function AgenteHomeScreen() {
         .slice(0, 3),
     [notificacoes],
   );
-
-  const pendentes = notificacoes.filter(
-    (n) => n.status === "EM ANDAMENTO",
-  ).length;
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
@@ -278,9 +278,29 @@ export default function AgenteHomeScreen() {
           </View>
         ) : (
           <View style={styles.statsRow}>
-            <StatsCard value={stats.total} label="Total notif." />
-            <StatsCard value={stats.investigacao} label="Em investigação" />
-            <StatsCard value={stats.confirmados} label="Confirmados" />
+            <View style={styles.statItem}>
+              <StatsCard value={stats.total} label="Total notif." />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.pendentes} label="Pendentes" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.investigacao} label="Em investigação" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.veridicos} label="Verídicas" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.encerradas} label="Encerradas" />
+            </View>
           </View>
         )}
 
@@ -422,7 +442,18 @@ const styles = StyleSheet.create({
     color: Colors.gray900,
     letterSpacing: -0.4,
   },
-  statsRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+
+  statItem: {
+    width: "31%",
+  },
+
   loadingRow: {
     height: 70,
     alignItems: "center",
@@ -468,27 +499,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   profileBtn: {
-  width: 42,
-  height: 42,
-  borderRadius: 21,
-  alignItems: "center",
-  justifyContent: "center",
-},
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-profileBtnInner: {
-  width: 38,
-  height: 38,
-  borderRadius: 19,
-  backgroundColor: "rgba(255,255,255,0.2)",
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 2,
-  borderColor: "rgba(255,255,255,0.4)",
-},
+  profileBtnInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
 
-profileBtnText: {
-  fontSize: 14,
-  fontWeight: "700",
-  color: Colors.white,
-},
+  profileBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.white,
+  },
 });

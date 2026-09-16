@@ -2,13 +2,14 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import {
   buscarDadosUBS,
-  complementarNotificacao,
-  DadosUBS,
-  encaminharNotificacao,
   listarNotificacoesUBS,
+  setEmInvestigacao,
+  setEncerrado,
+  setNaoVeridico,
+  setVeridico,
+  DadosUBS,
   NotificacaoStatus,
   NotificacaoUBS,
-  validarNotificacao,
 } from "@/services/UbsService";
 import { UBSUser } from "@/types";
 import { router } from "expo-router";
@@ -32,26 +33,35 @@ import {
 
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
   {
-    "EM ANDAMENTO": { label: "Pendente", bg: "#FAEEDA", color: "#854F0B" },
-    VALIDADA: { label: "Validada", bg: Colors.teal50, color: Colors.teal800 },
-    ENCAMINHADA: { label: "Encaminhada", bg: "#E6F1FB", color: "#0C447C" },
-    COMPLEMENTADA: { label: "Complementada", bg: "#EEEDFE", color: "#534AB7" },
+    "EM ANDAMENTO": {
+      label: "Pendente",
+      bg: "#E4F0FD",
+      color: "#1261A0",
+    },
+
     "EM INVESTIGAÇÃO": {
       label: "Em investigação",
       bg: "#FAEEDA",
       color: "#854F0B",
     },
-    CONFIRMADO: {
-      label: "Confirmado",
+
+    VERÍDICO: {
+      label: "Verídico",
       bg: Colors.teal50,
       color: Colors.teal800,
     },
-    DESCARTADO: {
-      label: "Descartado",
+
+    "NÃO VERÍDICO": {
+      label: "Não verídico",
+      bg: "#FDE8E8",
+      color: "#C62828",
+    },
+
+    ENCERRADO: {
+      label: "Encerrado",
       bg: Colors.gray50,
       color: Colors.gray600,
     },
-    ENCERRADO: { label: "Encerrado", bg: Colors.gray50, color: Colors.gray400 },
   };
 
 const CATEGORIA_COLOR: Record<string, string> = {
@@ -80,109 +90,16 @@ function StatsCard({ value, label }: { value: number; label: string }) {
   );
 }
 
-// ─── Modal de complementar ────────────────────────────────────────────────────
-
-interface ComplementarModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onConfirm: (texto: string) => Promise<void>;
-}
-
-function ComplementarModal({
-  visible,
-  onClose,
-  onConfirm,
-}: ComplementarModalProps) {
-  const [texto, setTexto] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleConfirm() {
-    if (!texto.trim()) return;
-    setLoading(true);
-    await onConfirm(texto.trim());
-    setLoading(false);
-    setTexto("");
-  }
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalBox}>
-          <Text style={styles.modalTitle}>Complementar notificação</Text>
-          <Text style={styles.modalSub}>
-            Adicione informações ao registro. O texto será anexado à descrição
-            original.
-          </Text>
-          <TextInput
-            style={styles.modalInput}
-            value={texto}
-            onChangeText={setTexto}
-            placeholder="Descreva o complemento..."
-            placeholderTextColor={Colors.gray200}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            autoFocus
-          />
-          <View style={styles.modalBtns}>
-            <TouchableOpacity
-              style={styles.modalBtnOutline}
-              onPress={onClose}
-              disabled={loading}
-            >
-              <Text style={styles.modalBtnOutlineText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modalBtnSolid,
-                !texto.trim() && styles.modalBtnDisabled,
-              ]}
-              onPress={handleConfirm}
-              disabled={loading || !texto.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <Text style={styles.modalBtnSolidText}>Salvar</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Card de notificação ──────────────────────────────────────────────────────
 
 interface NotifCardProps {
   item: NotificacaoUBS;
-  onValidar: () => void;
-  onEncaminhar: () => void;
-  onComplementar: () => void;
   onPress: () => void;
-  loadingId: number | null;
 }
 
-function NotifCard({
-  item,
-  onValidar,
-  onEncaminhar,
-  onComplementar,
-  onPress,
-  loadingId,
-}: NotifCardProps) {
+function NotifCard({ item, onPress }: NotifCardProps) {
   const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
-
-  const isPending =
-    item.status === "EM ANDAMENTO" || item.status === "COMPLEMENTADA";
-
-  const isLoading = loadingId === item.id;
+  const isPending = item.status === "EM ANDAMENTO";
 
   const dataFormatada = new Date(item.data_envio).toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -226,46 +143,6 @@ function NotifCard({
       </Text>
 
       {/* Ações */}
-      {isPending && (
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnValidar]}
-            onPress={onValidar}
-            disabled={isLoading}
-            activeOpacity={0.8}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={Colors.teal800} size="small" />
-            ) : (
-              <Text style={[styles.actionBtnText, { color: Colors.teal800 }]}>
-                ✓ Validar
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnEncaminhar]}
-            onPress={onEncaminhar}
-            disabled={isLoading}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnText, { color: "#0C447C" }]}>
-              ↗ Encaminhar
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnComplementar]}
-            onPress={onComplementar}
-            disabled={isLoading}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnText, { color: Colors.gray600 }]}>
-              Complementar
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </Pressable>
   );
 }
@@ -273,6 +150,8 @@ function NotifCard({
 interface NotifDetailModalProps {
   item: NotificacaoUBS | null;
   onClose: () => void;
+  onStatusChange: (id: number, novoStatus: NotificacaoStatus) => Promise<void>;
+  loadingId: number | null;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -285,7 +164,12 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function NotifDetailModal({ item, onClose }: NotifDetailModalProps) {
+function NotifDetailModal({
+  item,
+  onClose,
+  onStatusChange,
+  loadingId,
+}: NotifDetailModalProps) {
   const [visible, setVisible] = useState(false);
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(40)).current;
@@ -420,7 +304,77 @@ function NotifDetailModal({ item, onClose }: NotifDetailModalProps) {
 
               <StatusBadge status={item.status} />
             </View>
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Alterar status</Text>
 
+              <View style={styles.statusActionsGrid}>
+                {[
+                  {
+                    label: "✓ Verídico",
+                    status: "VERÍDICO" as NotificacaoStatus,
+                    bg: Colors.teal50,
+                    border: Colors.teal100,
+                    color: Colors.teal800,
+                  },
+                  {
+                    label: "⟳ Em investigação",
+                    status: "EM INVESTIGAÇÃO" as NotificacaoStatus,
+                    bg: "#FAEEDA",
+                    border: "#FAC775",
+                    color: "#854F0B",
+                  },
+                  {
+                    label: "✗ Não verídico",
+                    status: "NÃO VERÍDICO" as NotificacaoStatus,
+                    bg: "#FDE8E8",
+                    border: "#F7C1C1",
+                    color: "#C62828",
+                  },
+                  {
+                    label: "■ Encerrado",
+                    status: "ENCERRADO" as NotificacaoStatus,
+                    bg: "#F0EEE9",
+                    border: "#D9D5CC",
+                    color: Colors.gray600,
+                  },
+                ].map((acao) => {
+                  const isActive = item.status === acao.status;
+                  const isLoading = loadingId === item.id;
+
+                  return (
+                    <TouchableOpacity
+                      key={acao.status}
+                      style={[
+                        styles.statusActionButton,
+                        {
+                          backgroundColor: acao.bg,
+                          borderColor: acao.border,
+                        },
+                        isActive && styles.statusActionButtonActive,
+                      ]}
+                      onPress={() => onStatusChange(item.id, acao.status)}
+                      disabled={isLoading || isActive}
+                      activeOpacity={0.8}
+                    >
+                      {isLoading && !isActive ? (
+                        <ActivityIndicator size="small" color={acao.color} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.statusActionText,
+                            {
+                              color: isActive ? Colors.white : acao.color,
+                            },
+                          ]}
+                        >
+                          {acao.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
             {/* Informações principais */}
             <View style={styles.detailSection}>
               <Text style={styles.detailSectionTitle}>
@@ -506,8 +460,6 @@ export default function UbsHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [complementarTarget, setComplementarTarget] =
-    useState<NotificacaoUBS | null>(null);
   const [selectedNotification, setSelectedNotification] =
     useState<NotificacaoUBS | null>(null);
 
@@ -528,14 +480,20 @@ export default function UbsHomeScreen() {
   }, []);
   const stats = useMemo(
     () => ({
-      recebidas: notificacoes.length,
-      pendentes: notificacoes.filter((n) => n.status === "EM ANDAMENTO").length,
-      encaminhadas: notificacoes.filter((n) => n.status === "ENCAMINHADA")
+      total: notificacoes.length,
+
+      investigacao: notificacoes.filter((n) => n.status === "EM INVESTIGAÇÃO")
         .length,
+
+      veridicos: notificacoes.filter((n) => n.status === "VERÍDICO").length,
+
+      naoVeridicos: notificacoes.filter((n) => n.status === "NÃO VERÍDICO")
+        .length,
+
+      encerrados: notificacoes.filter((n) => n.status === "ENCERRADO").length,
     }),
     [notificacoes],
   );
-
   // ─── Fetch ───────────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -560,58 +518,53 @@ export default function UbsHomeScreen() {
 
   // ─── Ações ───────────────────────────────────────────────────────────────────
 
-  async function handleValidar(id: number) {
+  async function handleStatusChange(id: number, novoStatus: NotificacaoStatus) {
     setLoadingId(id);
+
     try {
-      await validarNotificacao(id);
+      switch (novoStatus) {
+        case "EM INVESTIGAÇÃO":
+          await setEmInvestigacao(id);
+          break;
+
+        case "VERÍDICO":
+          await setVeridico(id);
+          break;
+
+        case "NÃO VERÍDICO":
+          await setNaoVeridico(id);
+          break;
+
+        case "ENCERRADO":
+          await setEncerrado(id);
+          break;
+
+        case "EM ANDAMENTO":
+          return;
+      }
+
       setNotificacoes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, status: "VALIDADA" } : n)),
+        prev.map((notificacao) =>
+          notificacao.id === id
+            ? { ...notificacao, status: novoStatus }
+            : notificacao,
+        ),
+      );
+
+      setSelectedNotification((prev) =>
+        prev && prev.id === id ? { ...prev, status: novoStatus } : prev,
       );
     } catch (err) {
       Alert.alert(
         "Erro",
-        err instanceof Error ? err.message : "Tente novamente.",
+        err instanceof Error
+          ? err.message
+          : "Não foi possível alterar o status.",
       );
     } finally {
       setLoadingId(null);
     }
   }
-
-  async function handleEncaminhar(id: number) {
-    setLoadingId(id);
-    try {
-      await encaminharNotificacao(id);
-      setNotificacoes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, status: "ENCAMINHADA" } : n)),
-      );
-    } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error ? err.message : "Tente novamente.",
-      );
-    } finally {
-      setLoadingId(null);
-    }
-  }
-
-  async function handleComplementar(texto: string) {
-    if (!complementarTarget) return;
-    const id = complementarTarget.id;
-    try {
-      await complementarNotificacao(id, texto);
-      setNotificacoes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, status: "COMPLEMENTADA" } : n)),
-      );
-    } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error ? err.message : "Tente novamente.",
-      );
-    } finally {
-      setComplementarTarget(null);
-    }
-  }
-
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -655,27 +608,19 @@ export default function UbsHomeScreen() {
           />
         }
       >
-        {/* Banner de pendentes */}
-        {stats.pendentes > 0 && (
-          <View style={styles.alertBanner}>
-            <Text style={styles.alertIcon}>⚠</Text>
-            <Text style={styles.alertText}>
-              <Text style={{ fontWeight: "700" }}>
-                {stats.pendentes} notificaç
-                {stats.pendentes === 1 ? "ão" : "ões"}
-              </Text>{" "}
-              aguarda{stats.pendentes === 1 ? "" : "m"} validação da unidade.
-            </Text>
-          </View>
-        )}
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          <StatsCard value={stats.recebidas} label="Recebidas" />
-          <StatsCard value={stats.pendentes} label="Pendentes" />
-          <StatsCard value={stats.encaminhadas} label="Encaminhadas" />
-        </View>
+          <StatsCard value={stats.total} label="Total" />
 
+          <StatsCard value={stats.investigacao} label="Em investigação" />
+
+          <StatsCard value={stats.veridicos} label="Verídicas" />
+
+          <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
+
+          <StatsCard value={stats.encerrados} label="Encerradas" />
+        </View>
         {/* Lista */}
         <Text style={styles.sectionLabel}>Notificações do território</Text>
 
@@ -696,10 +641,6 @@ export default function UbsHomeScreen() {
             <NotifCard
               key={item.id}
               item={item}
-              loadingId={loadingId}
-              onValidar={() => handleValidar(item.id)}
-              onEncaminhar={() => handleEncaminhar(item.id)}
-              onComplementar={() => setComplementarTarget(item)}
               onPress={() => setSelectedNotification(item)}
             />
           ))
@@ -718,15 +659,11 @@ export default function UbsHomeScreen() {
         <Text style={fabStyles.fabLabel}>Novo agente</Text>
       </TouchableOpacity>
 
-      {/* Modal de complementar */}
-      <ComplementarModal
-        visible={!!complementarTarget}
-        onClose={() => setComplementarTarget(null)}
-        onConfirm={handleComplementar}
-      />
       <NotifDetailModal
         item={selectedNotification}
         onClose={() => setSelectedNotification(null)}
+        onStatusChange={handleStatusChange}
+        loadingId={loadingId}
       />
     </View>
   );
@@ -892,28 +829,6 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 10, fontWeight: "600" },
 
-  // Action buttons
-  actionsRow: { flexDirection: "row", gap: Spacing.sm },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: Radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    minHeight: 36,
-  },
-  actionBtnText: { fontSize: 11, fontWeight: "600" },
-  actionBtnValidar: {
-    backgroundColor: Colors.teal50,
-    borderColor: Colors.teal100,
-  },
-  actionBtnEncaminhar: { backgroundColor: "#E6F1FB", borderColor: "#B5D4F4" },
-  actionBtnComplementar: {
-    backgroundColor: Colors.gray50,
-    borderColor: Colors.gray100,
-  },
-
   // Loading / empty
   loadingWrap: {
     paddingVertical: Spacing.xxl,
@@ -929,77 +844,10 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 40 },
   emptyText: { fontSize: FontSize.sm, color: Colors.gray400 },
 
-  // Modal complementar
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-  modalBox: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.xl,
-    gap: Spacing.md,
-  },
-  modalTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: "700",
-    color: Colors.gray900,
-  },
-  modalSub: { fontSize: FontSize.sm, color: Colors.gray400, lineHeight: 20 },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: Colors.gray100,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    fontSize: FontSize.base,
-    color: Colors.gray900,
-    minHeight: 100,
-    backgroundColor: Colors.bg,
-  },
-  modalBtns: { flexDirection: "row", gap: Spacing.md },
-  modalBtnOutline: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
-    borderColor: Colors.teal600,
-    alignItems: "center",
-  },
-  modalBtnOutlineText: {
-    fontSize: FontSize.base,
-    fontWeight: "600",
-    color: Colors.teal600,
-  },
-  modalBtnSolid: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.teal600,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 46,
-  },
-  modalBtnSolidText: {
-    fontSize: FontSize.base,
-    fontWeight: "700",
-    color: Colors.white,
-  },
-  modalBtnDisabled: { opacity: 0.4 },
   notifCardPressed: {
     transform: [{ scale: 0.985 }],
     opacity: 0.92,
   },
-
-  notifCardHovered: {
-    transform: [{ translateY: -2 }],
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-
-  // ─── Detail modal ────────────────────────────────────────────────────────────
 
   modalRoot: {
     flex: 1,
@@ -1030,7 +878,33 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 10,
   },
+  statusActionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
 
+  statusActionButton: {
+    flex: 1,
+    minWidth: "47%",
+    minHeight: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.sm,
+  },
+
+  statusActionButtonActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  statusActionText: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+  },
   detailHeader: {
     flexDirection: "row",
     alignItems: "flex-start",

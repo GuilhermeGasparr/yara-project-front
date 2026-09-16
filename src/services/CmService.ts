@@ -14,14 +14,11 @@ async function authHeader(): Promise<Record<string, string>> {
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type StatusCM =
-  | "RECEBIDO"
+  | "EM ANDAMENTO"
   | "EM INVESTIGAÇÃO"
-  | "CONFIRMADO"
-  | "DESCARTADO"
-  | "ENCERRADO"
-  | "VALIDADA"
-  | "ENCAMINHADA"
-  | "EM ANDAMENTO";
+  | "VERÍDICO"
+  | "NÃO VERÍDICO"
+  | "ENCERRADO";
 
 export interface NotificacaoCM {
   id: number;
@@ -41,7 +38,7 @@ export interface NotificacaoCM {
 export interface DashboardStats {
   total: number;
   em_investigacao: number;
-  confirmados: number;
+  veridicos: number;
 }
 
 // ─── GET /cm/listar_notificacoes ──────────────────────────────────────────────
@@ -67,28 +64,38 @@ export async function buscarDashboardStats(): Promise<DashboardStats> {
 // ─── PATCH status ─────────────────────────────────────────────────────────────
 
 type StatusEndpoint =
-  | "status_recebido"
   | "status_em_investigacao"
-  | "status_confirmado"
-  | "status_descartado"
+  | "status_veridico"
+  | "status_nao_veridico"
   | "status_encerrado";
 
-async function patchStatus(id: number, endpoint: StatusEndpoint): Promise<void> {
+async function patchStatus(
+  id: number,
+  endpoint: StatusEndpoint,
+): Promise<void> {
   const headers = await authHeader();
+
   const res = await fetch(`${BASE_URL}/cm/notificacoes/${id}/${endpoint}`, {
     method: "PATCH",
     headers,
   });
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? "Erro ao atualizar status.");
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao atualizar status.");
+  }
 }
 
-export const setRecebido      = (id: number) => patchStatus(id, "status_recebido");
-export const setEmInvestigacao = (id: number) => patchStatus(id, "status_em_investigacao");
-export const setConfirmado    = (id: number) => patchStatus(id, "status_confirmado");
-export const setDescartado    = (id: number) => patchStatus(id, "status_descartado");
-export const setEncerrado     = (id: number) => patchStatus(id, "status_encerrado");
+export const setEmInvestigacao = (id: number) =>
+  patchStatus(id, "status_em_investigacao");
 
+export const setVeridico = (id: number) => patchStatus(id, "status_veridico");
+
+export const setNaoVeridico = (id: number) =>
+  patchStatus(id, "status_nao_veridico");
+
+export const setEncerrado = (id: number) => patchStatus(id, "status_encerrado");
 // ─── GET /cm/exportar_relatorio ───────────────────────────────────────────────
 
 export async function exportarRelatorio(): Promise<unknown[]> {
@@ -102,13 +109,10 @@ export async function exportarRelatorio(): Promise<unknown[]> {
 export async function exportarRelatorioPDF(): Promise<Blob> {
   const headers = await authHeader();
 
-  const res = await fetch(
-    `${BASE_URL}/cm/exportar_relatorio/pdf`,
-    {
-      method: "GET",
-      headers,
-    }
-  );
+  const res = await fetch(`${BASE_URL}/cm/exportar_relatorio/pdf`, {
+    method: "GET",
+    headers,
+  });
 
   if (!res.ok) {
     let message = "Erro ao gerar PDF.";
@@ -124,9 +128,8 @@ export async function exportarRelatorioPDF(): Promise<Blob> {
   return await res.blob();
 }
 
-
 export async function baixarRelatorioNotificacaoPDF(
-  notificacaoId: number
+  notificacaoId: number,
 ): Promise<Blob> {
   const headers = await authHeader();
 
@@ -135,7 +138,7 @@ export async function baixarRelatorioNotificacaoPDF(
     {
       method: "GET",
       headers,
-    }
+    },
   );
 
   if (!res.ok) {
