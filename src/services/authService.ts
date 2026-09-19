@@ -82,6 +82,15 @@ export function buildUserFromToken(
       superintendencia: (extras?.["superintendencia"] as number) ?? 0,
     };
   }
+
+  if (tipo === "VE") {
+  return {
+    role: "ve",
+    id,
+    nome: (extras?.["nome"] as string) ?? "",
+    cpf: (extras?.["cpf"] as string) ?? "",
+  };
+}
   throw new Error(`Tipo de usuário desconhecido: ${tipo}`);
 }
 

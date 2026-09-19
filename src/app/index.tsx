@@ -34,8 +34,8 @@ function SentinelaLogo() {
 }
 
 interface RoleSelectorProps {
-  selectedRole: "ACS/ACE" | "UBS" | "CM" | "VR" | "";
-  onChangeRole: (role: "ACS/ACE" | "UBS" | "CM" | "VR") => void;
+  selectedRole: "ACS/ACE" | "UBS" | "CM" | "VR" | "VE" | "";
+  onChangeRole: (role: "ACS/ACE" | "UBS" | "CM" | "VR" | "VE") => void;
   hasError?: boolean;
 }
 
@@ -56,12 +56,8 @@ function RoleSelector({
   const fadeCM = useRef(new Animated.Value(0.6)).current;
   const scaleVR = useRef(new Animated.Value(1)).current;
   const fadeVR = useRef(new Animated.Value(0.6)).current;
-
-  Animated.timing(fadeVR, {
-    toValue: selectedRole === "VR" ? 1 : 0.6,
-    duration: 200,
-    useNativeDriver: true,
-  }).start();
+  const scaleVE = useRef(new Animated.Value(1)).current;
+  const fadeVE = useRef(new Animated.Value(0.6)).current;
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
@@ -70,8 +66,8 @@ function RoleSelector({
   useEffect(() => {
     if (containerWidth === 0) return;
 
-    // Se não houver nada selecionado (""), deixa o indicador escondido ou na esquerda invisível
-    const optionWidth = containerWidth / 4;
+    const optionWidth = containerWidth / 5;
+
     const targetValue =
       selectedRole === "ACS/ACE"
         ? 0
@@ -81,7 +77,9 @@ function RoleSelector({
             ? optionWidth * 2
             : selectedRole === "VR"
               ? optionWidth * 3
-              : 0;
+              : selectedRole === "VE"
+                ? optionWidth * 4
+                : 0;
 
     Animated.spring(sliderAnim, {
       toValue: targetValue,
@@ -107,9 +105,21 @@ function RoleSelector({
       duration: 200,
       useNativeDriver: true,
     }).start();
+
+    Animated.timing(fadeVR, {
+      toValue: selectedRole === "VR" ? 1 : 0.6,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(fadeVE, {
+      toValue: selectedRole === "VE" ? 1 : 0.6,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
   }, [selectedRole, containerWidth]);
 
-  const onPressIn = (role: "ACS/ACE" | "UBS" | "CM" | "VR") => {
+  const onPressIn = (role: "ACS/ACE" | "UBS" | "CM" | "VR" | "VE") => {
     const scale =
       role === "ACS/ACE"
         ? scaleACS
@@ -117,18 +127,28 @@ function RoleSelector({
           ? scaleUBS
           : role === "CM"
             ? scaleCM
-            : scaleVR;
+            : role === "VR"
+              ? scaleVR
+              : scaleVE;
 
     Animated.timing(scale, {
-      toValue: 1,
+      toValue: 0.97,
       duration: 100,
       useNativeDriver: true,
     }).start();
   };
 
-  const onPressOut = (role: "ACS/ACE" | "UBS" | "CM" | "VR") => {
+  const onPressOut = (role: "ACS/ACE" | "UBS" | "CM" | "VR" | "VE") => {
     const scale =
-      role === "ACS/ACE" ? scaleACS : role === "UBS" ? scaleUBS : scaleCM;
+      role === "ACS/ACE"
+        ? scaleACS
+        : role === "UBS"
+          ? scaleUBS
+          : role === "CM"
+            ? scaleCM
+            : role === "VR"
+              ? scaleVR
+              : scaleVE;
 
     Animated.timing(scale, {
       toValue: 1,
@@ -137,14 +157,13 @@ function RoleSelector({
     }).start();
   };
 
-  const sliderWidth = containerWidth ? containerWidth / 4 - 4 : 0;
-
+  const sliderWidth = containerWidth ? containerWidth / 5 - 4 : 0;
   const showIndicator =
     selectedRole === "ACS/ACE" ||
     selectedRole === "UBS" ||
     selectedRole === "CM" ||
-    selectedRole === "VR";
-
+    selectedRole === "VR" ||
+    selectedRole === "VE";
   return (
     <View
       style={[
@@ -288,6 +307,39 @@ function RoleSelector({
             ]}
           >
             Vig. Regional
+          </Text>
+        </Animated.View>
+      </Pressable>
+      <Pressable
+        onPressIn={() => onPressIn("VE")}
+        onPressOut={() => onPressOut("VE")}
+        onPress={() => onChangeRole("VE")}
+        style={styles.selectorOption}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: selectedRole === "VE" }}
+      >
+        <Animated.View
+          style={[
+            styles.optionContent,
+            {
+              transform: [{ scale: scaleVE }],
+              opacity: fadeVE,
+            },
+          ]}
+        >
+          <Feather
+            name="globe"
+            size={16}
+            color={selectedRole === "VE" ? Colors.teal600 : Colors.gray400}
+          />
+
+          <Text
+            style={[
+              styles.selectorText,
+              selectedRole === "VE" && styles.selectorTextActive,
+            ]}
+          >
+            Vig. Estadual
           </Text>
         </Animated.View>
       </Pressable>
@@ -455,6 +507,8 @@ export default function LoginScreen() {
         router.replace("/(cm)");
       } else if (form.tipo_login === "VR") {
         router.replace("/(regional)");
+      } else if (form.tipo_login === "VE") {
+        router.replace("/(estadual)");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao autenticar.";

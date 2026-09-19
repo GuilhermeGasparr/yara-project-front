@@ -3,7 +3,7 @@ import { useState } from 'react';
 interface LoginForm {
   cpf: string;
   senha: string;
-  tipo_login: "ACS/ACE" | "UBS" | "CM" | "VR" |"";
+  tipo_login: "ACS/ACE" | "UBS" | "CM" | "VR" |"VE"|"";
 }
 
 interface LoginErrors {
