@@ -2,6 +2,7 @@ import { getItem } from "@/utils/storage";
 import type { Notificacao } from "./NotificationService";
 
 const BASE_URL = "https://yara-project.onrender.com";
+
 async function authHeader(): Promise<Record<string, string>> {
   const token = await getItem("sentinela_token");
 
@@ -14,10 +15,10 @@ async function authHeader(): Promise<Record<string, string>> {
   };
 }
 
-export async function listarNotificacoesRegionais(): Promise<Notificacao[]> {
+export async function listarNotificacoesVE(): Promise<Notificacao[]> {
   const headers = await authHeader();
 
-  const response = await fetch(`${BASE_URL}/vr/notificacoes`, {
+  const response = await fetch(`${BASE_URL}/ve/notificacoes`, {
     headers,
   });
 
@@ -25,9 +26,9 @@ export async function listarNotificacoesRegionais(): Promise<Notificacao[]> {
 
   if (!response.ok) {
     throw new Error(
-      data.detail ?? "Erro ao carregar notificações da regional."
+      data.detail ?? "Erro ao carregar notificações estaduais.",
     );
   }
 
-  return (data.notificacoes ?? []) as Notificacao[];
+  return (data["Notificações"] ?? []) as Notificacao[];
 }

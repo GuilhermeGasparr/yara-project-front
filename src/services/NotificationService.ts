@@ -1,16 +1,14 @@
 import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
-//const BASE_URL = "https://yara-project.onrender.com";
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type NotificacaoStatus =
   | "EM ANDAMENTO"
-  | "RECEBIDO"
   | "EM INVESTIGAÇÃO"
-  | "CONFIRMADO"
-  | "DESCARTADO"
+  | "VERÍDICO"
+  | "NÃO VERÍDICO"
   | "ENCERRADO";
 
 export type Categoria = "DOENÇA" | "EPIZOOTIA" | "DESASTRE";

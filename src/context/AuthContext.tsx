@@ -108,6 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           cpf: usuario.cpf,
           superintendencia: usuario.superintendencia ?? 0,
         };
+      } else if (me.role === "ve") {
+        fullUser = {
+          ...me,
+          id: usuario.id,
+          nome: usuario.nome,
+          cpf: usuario.cpf,
+        };
       } else {
         throw new Error("Papel de usuário desconhecido.");
       }

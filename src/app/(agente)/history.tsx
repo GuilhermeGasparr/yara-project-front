@@ -141,7 +141,7 @@ export default function HistoryScreen() {
               ]}
               numberOfLines={1}
             >
-              {item.status}
+              {formatarStatus(item.status)}
             </Text>
           </View>
         </View>
@@ -413,6 +413,28 @@ function formatarCategoria(categoria: string) {
   }
 }
 
+function formatarStatus(status: string) {
+  switch (status) {
+    case "EM ANDAMENTO":
+      return "Pendente";
+
+    case "EM INVESTIGAÇÃO":
+      return "Em investigação";
+
+    case "VERÍDICO":
+      return "Verídico";
+
+    case "NÃO VERÍDICO":
+      return "Não verídico";
+
+    case "ENCERRADO":
+      return "Encerrado";
+
+    default:
+      return status;
+  }
+}
+
 function getCategoriaStyle(categoria: string) {
   switch (categoria) {
     case "DOENÇA":
@@ -449,7 +471,19 @@ function getStatusStyle(status: string) {
         color: "#A15C00",
       };
 
-    case "RECEBIDO":
+    case "VERÍDICO":
+      return {
+        backgroundColor: "#DDF3EC",
+        color: "#007C68",
+      };
+
+    case "NÃO VERÍDICO":
+      return {
+        backgroundColor: "#FDE8E8",
+        color: "#C62828",
+      };
+
+    case "EM ANDAMENTO":
       return {
         backgroundColor: "#E4F0FD",
         color: "#1261A0",
@@ -459,24 +493,6 @@ function getStatusStyle(status: string) {
       return {
         backgroundColor: "#F0EEE9",
         color: "#77736A",
-      };
-
-    case "CONFIRMADO":
-      return {
-        backgroundColor: "#DDF3EC",
-        color: "#007C68",
-      };
-
-    case "EM ANDAMENTO":
-      return {
-        backgroundColor: "#E4F0FD",
-        color: "#1261A0",
-      };
-
-    case "DESCARTADO":
-      return {
-        backgroundColor: "#FDE8E8",
-        color: "#C62828",
       };
 
     default:

@@ -1,7 +1,6 @@
 import { getItem } from "@/utils/storage";
 
-//const BASE_URL = "https://yara-project.onrender.com";
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
 
 const BASE_HEADERS: Record<string, string> = {
   "ngrok-skip-browser-warning": "true",
@@ -17,12 +16,9 @@ async function authHeader(): Promise<Record<string, string>> {
 
 export type NotificacaoStatus =
   | "EM ANDAMENTO"
-  | "VALIDADA"
-  | "ENCAMINHADA"
-  | "COMPLEMENTADA"
   | "EM INVESTIGAÇÃO"
-  | "CONFIRMADO"
-  | "DESCARTADO"
+  | "VERÍDICO"
+  | "NÃO VERÍDICO"
   | "ENCERRADO";
 
 export type Categoria = "DOENÇA" | "EPIZOOTIA" | "DESASTRE";
@@ -81,7 +77,7 @@ export async function encaminharNotificacao(id: number): Promise<void> {
 
 export async function complementarNotificacao(
   id: number,
-  informacao_extra: string
+  informacao_extra: string,
 ): Promise<void> {
   const headers = await authHeader();
   const url = `${BASE_URL}/ubs/notificacoes/${id}/complementar?informacao_extra=${encodeURIComponent(informacao_extra)}`;
@@ -94,6 +90,77 @@ export interface DadosUBS {
   id: number;
   nome: string;
   // adicione outros campos se existirem no seu model Dados_UBS
+}
+export async function setEmInvestigacao(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/ubs/notificacoes/${id}/status_em_investigacao`,
+    {
+      method: "PATCH",
+      headers,
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao alterar status.");
+  }
+}
+
+export async function setVeridico(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/ubs/notificacoes/${id}/status_veridico`,
+    {
+      method: "PATCH",
+      headers,
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao alterar status.");
+  }
+}
+
+export async function setNaoVeridico(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/ubs/notificacoes/${id}/status_nao_veridico`,
+    {
+      method: "PATCH",
+      headers,
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao alterar status.");
+  }
+}
+
+export async function setEncerrado(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/ubs/notificacoes/${id}/status_encerrado`,
+    {
+      method: "PATCH",
+      headers,
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao alterar status.");
+  }
 }
 
 export async function buscarDadosUBS(): Promise<DadosUBS> {

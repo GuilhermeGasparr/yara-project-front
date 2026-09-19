@@ -34,12 +34,19 @@ export interface VRUser {
   cpf: string;
   superintendencia: number;
 }
-export type AuthUser = AgenteUser | UBSUser | CMUser | VRUser;
+export interface VEUser {
+  role: "ve";
+  id: number;
+  nome: string;
+  cpf: string;
+}
+
+export type AuthUser = AgenteUser | UBSUser | CMUser | VRUser | VEUser;
 
 export interface LoginPayload {
   cpf: string;
   senha: string;
-  tipo_login?: "ACS/ACE" | "UBS" | "CM" | "VR";
+  tipo_login?: "ACS/ACE" | "UBS" | "CM" | "VR" | "VE";
 }
 
 export interface LoginUsuario {
