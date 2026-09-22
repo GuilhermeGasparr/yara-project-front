@@ -73,16 +73,24 @@ export const CONTINUIDADE_OPTIONS = ["Sim", "Não", "Não sei"];
 
 export interface WizardData {
   categoria: Categoria | null;
+
   tipo_evento: string;
+  outro_tipo_evento: string;
+
+  local_ocorrencia: string;
+  outro_local_ocorrencia: string;
+
+  meio_identificacao: string;
+  outro_meio_identificacao: string;
+
   data_aproximada: string;
   pessoas_animais: string;
-  local_ocorrencia: string;
   estado?: "Ceará";
   municipio: string;
   endereco: string;
   latitude?: number;
   longitude?: number;
-  meio_identificacao: string;
+
   continuidade_situacao: string;
   descricao: string;
   transcricao: string;
@@ -93,16 +101,24 @@ export interface WizardData {
 
 export const WIZARD_INITIAL: WizardData = {
   categoria: null,
+
   tipo_evento: "",
+  outro_tipo_evento: "",
+
+  local_ocorrencia: "",
+  outro_local_ocorrencia: "",
+
+  meio_identificacao: "",
+  outro_meio_identificacao: "",
+
   data_aproximada: "",
   pessoas_animais: "",
-  local_ocorrencia: "",
   endereco: "",
   latitude: undefined,
   estado: "Ceará",
   municipio: "",
   longitude: undefined,
-  meio_identificacao: "",
+
   continuidade_situacao: "Não sei",
   descricao: "",
   transcricao: "",

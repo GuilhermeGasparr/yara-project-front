@@ -13,32 +13,22 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-import {
-  Colors,
-  FontSize,
-  Radius,
-  Spacing,
-} from "@/constants/theme";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
   listarNotificacoes,
   Notificacao,
 } from "@/services/NotificationService";
 
-const filtros = [
-  "Todos",
-  "DOENÇA",
-  "EPIZOOTIA",
-  "DESASTRE",
-  "EM INVESTIGAÇÃO",
-];
+const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
 
 export default function HistoryScreen() {
   const { width } = useWindowDimensions();
 
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [filtro, setFiltro] = useState("Todos");
-
+  const [selectedNotification, setSelectedNotification] =
+    useState<Notificacao | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -53,15 +43,12 @@ export default function HistoryScreen() {
 
       setNotificacoes(dados);
     } catch (error) {
-      console.error(
-        "Erro ao carregar notificações:",
-        error
-      );
+      console.error("Erro ao carregar notificações:", error);
 
       setErro(
         error instanceof Error
           ? error.message
-          : "Erro ao carregar notificações."
+          : "Erro ao carregar notificações.",
       );
     } finally {
       setLoading(false);
@@ -78,48 +65,25 @@ export default function HistoryScreen() {
     }
 
     if (filtro === "EM INVESTIGAÇÃO") {
-      return notificacoes.filter(
-        (item) => item.status === "EM INVESTIGAÇÃO"
-      );
+      return notificacoes.filter((item) => item.status === "EM INVESTIGAÇÃO");
     }
 
-    return notificacoes.filter(
-      (item) => item.categoria === filtro
-    );
+    return notificacoes.filter((item) => item.categoria === filtro);
   }, [notificacoes, filtro]);
 
-  const renderNotificacao = ({
-    item,
-  }: {
-    item: Notificacao;
-  }) => {
-    const categoriaStyle = getCategoriaStyle(
-      item.categoria
-    );
+  const renderNotificacao = ({ item }: { item: Notificacao }) => {
+    const categoriaStyle = getCategoriaStyle(item.categoria);
 
-    const statusStyle = getStatusStyle(
-      item.status
-    );
+    const statusStyle = getStatusStyle(item.status);
 
     return (
       <Pressable
-        style={({ pressed }) => [
-          styles.card,
-          pressed && styles.cardPressed,
-        ]}
-        onPress={() => {
-          console.log(
-            "Notificação selecionada:",
-            item.id
-          );
-        }}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        onPress={() => setSelectedNotification(item)}
       >
         {/* Título + Status */}
         <View style={styles.cardHeader}>
-          <Text
-            style={styles.cardTitle}
-            numberOfLines={2}
-          >
+          <Text style={styles.cardTitle} numberOfLines={2}>
             {item.nome}
           </Text>
 
@@ -127,8 +91,7 @@ export default function HistoryScreen() {
             style={[
               styles.statusBadge,
               {
-                backgroundColor:
-                  statusStyle.backgroundColor,
+                backgroundColor: statusStyle.backgroundColor,
               },
             ]}
           >
@@ -148,18 +111,14 @@ export default function HistoryScreen() {
 
         {/* Data + tipo */}
         <Text style={styles.metadata}>
-          {formatarData(item.data_envio)} •{" "}
-          {item.tipo_evento}
+          {formatarData(item.data_envio)} • {item.tipo_evento}
         </Text>
 
         {/* Local + afetados */}
-        <Text
-          style={styles.description}
-          numberOfLines={2}
-        >
+        <Text style={styles.description} numberOfLines={2}>
           {formatarAfetados(
             item.pessoas_animais_infectados_afetados,
-            item.categoria
+            item.categoria,
           )}{" "}
           • {item.local_ocorrencia}
         </Text>
@@ -172,8 +131,7 @@ export default function HistoryScreen() {
             style={[
               styles.categoryBadge,
               {
-                backgroundColor:
-                  categoriaStyle.backgroundColor,
+                backgroundColor: categoriaStyle.backgroundColor,
               },
             ]}
           >
@@ -189,9 +147,7 @@ export default function HistoryScreen() {
             </Text>
           </View>
 
-          <Text style={styles.notificationId}>
-            #{item.id} →
-          </Text>
+          <Text style={styles.notificationId}>#{item.id} →</Text>
         </View>
       </Pressable>
     );
@@ -199,10 +155,7 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={Colors.teal800}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.teal800} />
 
       {/* HEADER */}
       <View style={styles.header}>
@@ -211,26 +164,13 @@ export default function HistoryScreen() {
           onPress={() => router.back()}
           hitSlop={10}
         >
-          <Feather
-            name="arrow-left"
-            size={19}
-            color={Colors.white}
-          />
+          <Feather name="arrow-left" size={19} color={Colors.white} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>
-          Minhas Notificações
-        </Text>
+        <Text style={styles.headerTitle}>Minhas Notificações</Text>
 
-        <Pressable
-          style={styles.searchButton}
-          hitSlop={10}
-        >
-          <Feather
-            name="search"
-            size={23}
-            color={Colors.white}
-          />
+        <Pressable style={styles.searchButton} hitSlop={10}>
+          <Feather name="search" size={23} color={Colors.white} />
         </Pressable>
       </View>
 
@@ -250,22 +190,17 @@ export default function HistoryScreen() {
                 onPress={() => setFiltro(item)}
                 style={[
                   styles.filterButton,
-                  selected &&
-                    styles.filterButtonSelected,
+                  selected && styles.filterButtonSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.filterText,
-                    selected &&
-                      styles.filterTextSelected,
-                    isSmallScreen &&
-                      styles.filterTextSmall,
+                    selected && styles.filterTextSelected,
+                    isSmallScreen && styles.filterTextSmall,
                   ]}
                 >
-                  {item === "Todos"
-                    ? "Todos"
-                    : formatarCategoria(item)}
+                  {item === "Todos" ? "Todos" : formatarCategoria(item)}
                 </Text>
               </Pressable>
             );
@@ -276,51 +211,29 @@ export default function HistoryScreen() {
       {/* CONTEÚDO */}
       {loading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator
-            size="large"
-            color={Colors.teal600}
-          />
+          <ActivityIndicator size="large" color={Colors.teal600} />
 
-          <Text style={styles.stateText}>
-            Carregando notificações...
-          </Text>
+          <Text style={styles.stateText}>Carregando notificações...</Text>
         </View>
       ) : erro ? (
         <View style={styles.centerState}>
-          <Feather
-            name="alert-circle"
-            size={42}
-            color={Colors.gray400}
-          />
+          <Feather name="alert-circle" size={42} color={Colors.gray400} />
 
-          <Text style={styles.emptyTitle}>
-            Não foi possível carregar
-          </Text>
+          <Text style={styles.emptyTitle}>Não foi possível carregar</Text>
 
-          <Text style={styles.emptyText}>
-            {erro}
-          </Text>
+          <Text style={styles.emptyText}>{erro}</Text>
 
-          <Pressable
-            style={styles.retryButton}
-            onPress={carregarNotificacoes}
-          >
-            <Text style={styles.retryText}>
-              Tentar novamente
-            </Text>
+          <Pressable style={styles.retryButton} onPress={carregarNotificacoes}>
+            <Text style={styles.retryText}>Tentar novamente</Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
           data={notificacoesFiltradas}
-          keyExtractor={(item) =>
-            item.id.toString()
-          }
+          keyExtractor={(item) => item.id.toString()}
           renderItem={renderNotificacao}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={
-            styles.listContent
-          }
+          contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => (
             <View
               style={{
@@ -332,25 +245,223 @@ export default function HistoryScreen() {
           onRefresh={carregarNotificacoes}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Feather
-                name="inbox"
-                size={42}
-                color={Colors.gray400}
-              />
+              <Feather name="inbox" size={42} color={Colors.gray400} />
 
-              <Text style={styles.emptyTitle}>
-                Nenhuma notificação
-              </Text>
+              <Text style={styles.emptyTitle}>Nenhuma notificação</Text>
 
               <Text style={styles.emptyText}>
-                Não existem notificações para esse
-                filtro.
+                Não existem notificações para esse filtro.
               </Text>
             </View>
           }
         />
       )}
+
+      <NotificacaoDetailModal
+        item={selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+      />
     </SafeAreaView>
+  );
+}
+function formatarDataCompleta(data: string) {
+  if (!data) {
+    return "Data não informada";
+  }
+
+  const date = new Date(data);
+
+  if (Number.isNaN(date.getTime())) {
+    return data;
+  }
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+function NotificacaoDetailModal({
+  item,
+  onClose,
+}: {
+  item: Notificacao | null;
+  onClose: () => void;
+}) {
+  if (!item) return null;
+
+  const statusStyle = getStatusStyle(item.status);
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        {/* CABEÇALHO */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderInfo}>
+            <Text style={styles.modalCategory}>
+              {formatarCategoria(item.categoria)}
+            </Text>
+
+            <Text style={styles.modalTitle}>
+              {item.nome || item.tipo_evento}
+            </Text>
+
+            <Text style={styles.modalProtocol}>
+              Notificação #{String(item.id).padStart(4, "0")}
+            </Text>
+          </View>
+
+          <Pressable
+            style={styles.modalCloseButton}
+            onPress={onClose}
+            hitSlop={10}
+          >
+            <Feather name="x" size={20} color={Colors.gray600} />
+          </Pressable>
+        </View>
+
+        {/* CONTEÚDO */}
+        <FlatList
+          data={[1]}
+          keyExtractor={() => "details"}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.modalContent}
+          renderItem={() => (
+            <>
+              {/* STATUS */}
+              <View
+                style={[
+                  styles.modalStatus,
+                  {
+                    backgroundColor: statusStyle.backgroundColor,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modalStatusText,
+                    {
+                      color: statusStyle.color,
+                    },
+                  ]}
+                >
+                  {formatarStatus(item.status)}
+                </Text>
+              </View>
+
+              {/* INFORMAÇÕES */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>
+                  Informações da notificação
+                </Text>
+
+                <DetailRow
+                  label="Município"
+                  value={item.municipio ?? "Não informado"}
+                />
+
+                <DetailRow
+                  label="Tipo de evento"
+                  value={item.tipo_evento || "Não informado"}
+                />
+
+                <DetailRow
+                  label="Categoria"
+                  value={formatarCategoria(item.categoria)}
+                />
+
+                <DetailRow
+                  label="Data de envio"
+                  value={formatarDataCompleta(item.data_envio)}
+                />
+
+                <DetailRow
+                  label="Local da ocorrência"
+                  value={item.local_ocorrencia || "Não informado"}
+                />
+
+                <DetailRow
+                  label="Pessoas/animais afetados"
+                  value={formatarAfetados(
+                    item.pessoas_animais_infectados_afetados,
+                    item.categoria,
+                  )}
+                />
+              </View>
+
+              {/* CONTINUIDADE */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>
+                  Continuidade da situação
+                </Text>
+
+                <Text style={styles.detailDescription}>
+                  {item.continuidade_situacao || "Não informado"}
+                </Text>
+              </View>
+
+              {/* DESCRIÇÃO */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Descrição</Text>
+
+                <Text style={styles.detailDescription}>
+                  {item.descricao || "Não informado"}
+                </Text>
+              </View>
+
+              {/* ENDEREÇO */}
+              {item.endereco && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Endereço</Text>
+
+                  <Text style={styles.detailDescription}>{item.endereco}</Text>
+                </View>
+              )}
+
+              {/* LOCALIZAÇÃO */}
+              {(item.latitude != null || item.longitude != null) && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Localização</Text>
+
+                  <DetailRow
+                    label="Latitude"
+                    value={
+                      item.latitude != null
+                        ? String(item.latitude)
+                        : "Não informado"
+                    }
+                  />
+
+                  <DetailRow
+                    label="Longitude"
+                    value={
+                      item.longitude != null
+                        ? String(item.longitude)
+                        : "Não informado"
+                    }
+                  />
+                </View>
+              )}
+            </>
+          )}
+        />
+
+        <Pressable style={styles.modalFooterButton} onPress={onClose}>
+          <Text style={styles.modalFooterButtonText}>Fechar relatório</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -383,10 +494,7 @@ function formatarData(data: string) {
   );
 }
 
-function formatarAfetados(
-  quantidade: number,
-  categoria: string
-) {
+function formatarAfetados(quantidade: number, categoria: string) {
   if (categoria === "EPIZOOTIA") {
     return `${quantidade} animais afetados`;
   }
@@ -618,7 +726,151 @@ const styles = StyleSheet.create({
     color: Colors.gray900,
     lineHeight: 21,
   },
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "flex-end",
+  },
 
+  modalCard: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2EBE8",
+  },
+
+  modalHeaderInfo: {
+    flex: 1,
+    paddingRight: Spacing.md,
+  },
+
+  modalCategory: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.teal600,
+    textTransform: "uppercase",
+  },
+
+  modalTitle: {
+    marginTop: 4,
+    fontSize: FontSize.lg,
+    fontWeight: "700",
+    color: Colors.gray900,
+  },
+
+  modalProtocol: {
+    marginTop: 4,
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
+  },
+
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalContent: {
+    paddingVertical: Spacing.md,
+    paddingBottom: 10,
+  },
+
+  modalStatus: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+
+  modalStatusText: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+  },
+
+  detailSection: {
+    marginBottom: Spacing.lg,
+  },
+
+  detailSectionTitle: {
+    fontSize: FontSize.base,
+    fontWeight: "700",
+    color: Colors.gray900,
+    marginBottom: 10,
+  },
+
+  detailRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3F1",
+  },
+
+  detailLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
+    marginBottom: 3,
+  },
+
+  detailValue: {
+    fontSize: FontSize.sm,
+    color: Colors.gray900,
+    lineHeight: 20,
+  },
+
+  detailDescription: {
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+    lineHeight: 21,
+  },
+
+  viewOnlyNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    backgroundColor: "#EAF6F3",
+    borderRadius: Radius.sm,
+    marginBottom: 10,
+  },
+
+  viewOnlyText: {
+    fontSize: FontSize.xs,
+    color: Colors.teal600,
+    fontWeight: "600",
+  },
+
+  modalFooterButton: {
+    height: 46,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.teal800,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalFooterButtonText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+  },
   statusBadge: {
     maxWidth: 135,
     paddingHorizontal: 11,

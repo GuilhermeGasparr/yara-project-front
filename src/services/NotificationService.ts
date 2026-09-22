@@ -2,6 +2,7 @@ import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
 const BASE_URL = "https://yara-project.onrender.com";
 
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type NotificacaoStatus =
@@ -37,18 +38,27 @@ export interface CriarNotificacaoPayload {
   nome: string;
   tipo_evento: string;
   categoria: Categoria;
+
   pessoas_animais_infectados_afetados: number;
+
   local_ocorrencia: string;
   endereco?: string;
   estado?: string;
   municipio?: string;
   latitude?: number;
   longitude?: number;
+
   continuidade_situacao: string;
   descricao: string;
+
   status: NotificacaoStatus;
   rascunho: boolean;
-  medias?: { uri: string; name: string; type: string }[];
+
+  medias?: {
+    uri: string;
+    name: string;
+    type: string;
+  }[];
 }
 
 // ─── Helper para obter o token armazenado ─────────────────────────────────────
@@ -89,14 +99,12 @@ export async function criarNotificacao(
   form.append("nome", payload.nome);
   form.append("tipo_evento", payload.tipo_evento);
   form.append("categoria", payload.categoria);
-
   form.append(
     "pessoas_animais_infectados_afetados",
     String(payload.pessoas_animais_infectados_afetados),
   );
 
   form.append("local_ocorrencia", payload.local_ocorrencia);
-
   // Novos campos enviados ao FormData
   if (payload.endereco) {
     form.append("endereco", payload.endereco);

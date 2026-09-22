@@ -1,6 +1,6 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { router } from "expo-router";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { router } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface Props {
   notificacaoId: number;
@@ -22,7 +22,9 @@ export function Step6Sucesso({ notificacaoId }: Props) {
       {/* Protocolo */}
       <View style={styles.protocoloBox}>
         <Text style={styles.protocoloLabel}>Número de protocolo</Text>
-        <Text style={styles.protocolo}>#{String(notificacaoId).padStart(7, "0")}</Text>
+        <Text style={styles.protocolo}>
+          #{String(notificacaoId).padStart(7, "0")}
+        </Text>
       </View>
 
       {/* Status card */}
@@ -34,7 +36,8 @@ export function Step6Sucesso({ notificacaoId }: Props) {
           </View>
         </View>
         <Text style={styles.statusInfo}>
-          A Unidade de Saúde irá validar e encaminhar à Coordenação Municipal de Vigilância.
+          A Unidade de Saúde irá validar e encaminhar à Coordenação Municipal de
+          Vigilância.
         </Text>
       </View>
 

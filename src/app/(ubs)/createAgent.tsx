@@ -20,16 +20,17 @@ import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { getItem } from "@/utils/storage";
 
-
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = "https://yara-project.onrender.com";
+
 async function criarAgente(payload: {
   nome: string;
   cpf: string;
   senha: string;
   cargo: "ACS" | "ACE";
   ubs_atuante: number;
+  microarea: string;
 }): Promise<void> {
   const token = await getItem("sentinela_token");
   const res = await fetch(`${BASE_URL}/ubs/criar_conta_acs_ace`, {
@@ -327,6 +328,7 @@ interface FormState {
   cpf: string;
   senha: string;
   confirmarSenha: string;
+  microarea: string;
 }
 
 interface FormErrors {
@@ -334,8 +336,8 @@ interface FormErrors {
   cpf?: string;
   senha?: string;
   confirmarSenha?: string;
+  microarea?: string;
 }
-
 
 export default function CreateAgentScreen() {
   const { user } = useAuth();
@@ -347,6 +349,7 @@ export default function CreateAgentScreen() {
     cpf: "",
     senha: "",
     confirmarSenha: "",
+    microarea: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({
@@ -354,6 +357,7 @@ export default function CreateAgentScreen() {
     cpf: false,
     senha: false,
     confirmarSenha: false,
+    microarea: false,
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -378,6 +382,9 @@ export default function CreateAgentScreen() {
       if (cpfNumeros.length !== 11) {
         e.cpf = "O CPF deve possuir 11 dígitos.";
       }
+    }
+    if (!f.microarea.trim()) {
+      e.microarea = "Microárea obrigatória.";
     }
 
     if (!f.senha) e.senha = "Senha obrigatória.";
@@ -409,6 +416,7 @@ export default function CreateAgentScreen() {
       cpf: true,
       senha: true,
       confirmarSenha: true,
+      microarea: true,
     };
     setTouched(allTouched);
     const errs = validate(form);
@@ -423,6 +431,7 @@ export default function CreateAgentScreen() {
         senha: form.senha,
         cargo,
         ubs_atuante: Number(ubsId),
+        microarea: form.microarea.trim(),
       });
       setSuccess(true);
     } catch (err) {
@@ -436,12 +445,19 @@ export default function CreateAgentScreen() {
   }
 
   function resetForm() {
-    setForm({ nome: "", cpf: "", senha: "", confirmarSenha: "" });
+    setForm({
+      nome: "",
+      cpf: "",
+      senha: "",
+      confirmarSenha: "",
+      microarea: "",
+    });
     setTouched({
       nome: false,
       cpf: false,
       senha: false,
       confirmarSenha: false,
+      microarea: false,
     });
     setErrors({});
     setSuccess(false);
@@ -519,7 +535,17 @@ export default function CreateAgentScreen() {
             onSubmitEditing={() => senhaRef.current?.focus()}
             inputRef={cpfRef}
           />
-
+          <AnimatedField
+            label="Microárea"
+            value={form.microarea}
+            placeholder=""
+            onChangeText={(v) => handleChange("microarea", v)}
+            onBlur={() => handleBlur("microarea")}
+            error={touched.microarea ? errors.microarea : undefined}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => senhaRef.current?.focus()}
+          />
           {/* Senha */}
           <Text style={styles.sectionLabel}>Acesso</Text>
 
@@ -558,10 +584,14 @@ export default function CreateAgentScreen() {
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>E-mail</Text>
+                <Text style={styles.previewKey}>CPF</Text>
                 <Text style={styles.previewVal} numberOfLines={1}>
                   {form.cpf || "—"}
                 </Text>
+              </View>
+              <View style={styles.previewRow}>
+                <Text style={styles.previewKey}>Microárea</Text>
+                <Text style={styles.previewVal}>{form.microarea || "—"}</Text>
               </View>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Cargo</Text>
