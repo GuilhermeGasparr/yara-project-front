@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import { useState, useEffect } from "react";
 import { router } from "expo-router";
-
+import {
+  obterDadosSuperintendencia,
+  type DadosSuperintendencia,
+} from "@/services/RegionalService";
 import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { VRUser } from "@/types";
@@ -23,13 +26,7 @@ function getInitials(nome: string): string {
     .join("");
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -40,9 +37,23 @@ function InfoRow({
 
 export default function RegionalProfileScreen() {
   const { user, signOut } = useAuth();
-
+  const [dadosSuperintendencia, setDadosSuperintendencia] =
+    useState<DadosSuperintendencia | null>(null);
   const vr = user as VRUser;
 
+  useEffect(() => {
+    async function carregarSuperintendencia() {
+      try {
+        const dados = await obterDadosSuperintendencia();
+
+        setDadosSuperintendencia(dados);
+      } catch (error) {
+        console.error("Erro ao carregar superintendência:", error);
+      }
+    }
+
+    carregarSuperintendencia();
+  }, []);
   async function doLogout() {
     await signOut();
 
@@ -62,21 +73,17 @@ export default function RegionalProfileScreen() {
       return;
     }
 
-    Alert.alert(
-      "Sair da conta",
-      "Tem certeza que deseja encerrar a sessão?",
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-        {
-          text: "Sair",
-          style: "destructive",
-          onPress: doLogout,
-        },
-      ],
-    );
+    Alert.alert("Sair da conta", "Tem certeza que deseja encerrar a sessão?", [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Sair",
+        style: "destructive",
+        onPress: doLogout,
+      },
+    ]);
   }
 
   const initials = vr?.nome ? getInitials(vr.nome) : "VR";
@@ -102,14 +109,10 @@ export default function RegionalProfileScreen() {
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
 
-          <Text style={styles.name}>
-            {vr?.nome ?? "Vigilância Regional"}
-          </Text>
+          <Text style={styles.name}>{vr?.nome ?? "Vigilância Regional"}</Text>
 
           <View style={styles.roleBadge}>
-            <Text style={styles.roleBadgeText}>
-              Vigilância Regional
-            </Text>
+            <Text style={styles.roleBadgeText}>Vigilância Regional</Text>
           </View>
         </View>
       </View>
@@ -121,46 +124,16 @@ export default function RegionalProfileScreen() {
       >
         {/* Informações do usuário */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>
-            Informações do usuário
-          </Text>
+          <Text style={styles.sectionLabel}>Informações do usuário</Text>
 
-          <InfoRow
-            label="Nome"
-            value={vr?.nome ?? "—"}
-          />
+          <InfoRow label="Nome" value={vr?.nome ?? "—"} />
 
-          <InfoRow
-            label="CPF"
-            value={vr?.cpf ?? "—"}
-          />
+          <InfoRow label="CPF" value={vr?.cpf ?? "—"} />
 
           <InfoRow
             label="Superintendência"
-            value={
-              vr?.superintendencia
-                ? String(vr.superintendencia)
-                : "—"
-            }
+            value={dadosSuperintendencia?.nome ?? "Carregando..."}
           />
-        </View>
-
-        {/* Configurações */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>
-            Configurações
-          </Text>
-
-          <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.actionText}>
-              Alterar senha
-            </Text>
-
-            <View style={styles.chevron} />
-          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -169,14 +142,10 @@ export default function RegionalProfileScreen() {
           onPress={handleSignOut}
           activeOpacity={0.85}
         >
-          <Text style={styles.logoutText}>
-            Sair da conta
-          </Text>
+          <Text style={styles.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>
-          Sentinela Saúde · v1.0
-        </Text>
+        <Text style={styles.version}>Sentinela Saúde · v1.0</Text>
 
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
@@ -220,10 +189,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderBottomWidth: 2,
     borderColor: Colors.white,
-    transform: [
-      { rotate: "45deg" },
-      { translateX: 2 },
-    ],
+    transform: [{ rotate: "45deg" }, { translateX: 2 }],
   },
 
   topbarTitle: {

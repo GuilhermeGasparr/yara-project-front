@@ -5,14 +5,17 @@ import { Step4Anexos } from "@/components/newNotification/Step4Attachments";
 import { Step5Revisao } from "@/components/newNotification/Step5Revision";
 import { Step6Sucesso } from "@/components/newNotification/Step6Sucess";
 import { WizardHeader } from "@/components/newNotification/WizardHeader";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   WIZARD_INITIAL,
   WizardData,
 } from "@/components/newNotification/constants";
 import { Colors, Spacing } from "@/constants/theme";
-import { criarNotificacao } from "@/services/NotificationService";
+import {
+  criarNotificacao,
+  listarNotificacoes,
+} from "@/services/NotificationService";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 
 const TOTAL_STEPS = 5; // passo 6 (sucesso) não conta na barra
@@ -68,22 +71,61 @@ export default function NewNotificationScreen() {
     }
     setSending(true);
     try {
-      const nome = `${data.categoria} — ${data.tipo_evento} (${new Date().toLocaleDateString("pt-BR")})`;
+      const tipoEventoFinal = data.tipo_evento
+        .trim()
+        .toLowerCase()
+        .includes("outro")
+        ? data.outro_tipo_evento.trim()
+        : data.tipo_evento;
 
-      const resultado = await criarNotificacao({
+      const localOcorrenciaFinal = data.local_ocorrencia
+        .trim()
+        .toLowerCase()
+        .includes("outro")
+        ? data.outro_local_ocorrencia.trim()
+        : data.local_ocorrencia;
+
+      const meioIdentificacaoFinal = data.meio_identificacao
+        .trim()
+        .toLowerCase()
+        .includes("outro")
+        ? data.outro_meio_identificacao.trim()
+        : data.meio_identificacao;
+      const nome = `${data.categoria} — ${tipoEventoFinal} (${new Date().toLocaleDateString("pt-BR")})`;
+
+      console.log("TIPO EVENTO ORIGINAL:", data.tipo_evento);
+      console.log("OUTRO TIPO EVENTO:", data.outro_tipo_evento);
+      console.log("TIPO EVENTO ENVIADO:", tipoEventoFinal);
+
+      if (!tipoEventoFinal) {
+        Alert.alert("Campo obrigatório", "Especifique o tipo de ocorrência.");
+        return;
+      }
+
+      if (!localOcorrenciaFinal) {
+        Alert.alert("Campo obrigatório", "Especifique o local da ocorrência.");
+        return;
+      }
+
+      if (!meioIdentificacaoFinal) {
+        Alert.alert(
+          "Campo obrigatório",
+          "Especifique como a ocorrência foi identificada.",
+        );
+        return;
+      }
+      await criarNotificacao({
         nome,
-        tipo_evento: data.tipo_evento,
+        tipo_evento: tipoEventoFinal,
         categoria: data.categoria,
         pessoas_animais_infectados_afetados: parseInt(
           data.pessoas_animais || "0",
           10,
         ),
-        local_ocorrencia: data.local_ocorrencia,
-
+        local_ocorrencia: localOcorrenciaFinal,
         endereco: data.endereco,
         estado: data.estado,
         municipio: data.municipio,
-
         continuidade_situacao: data.continuidade_situacao,
         descricao: data.descricao || data.transcricao || "Sem descrição.",
         status: "EM ANDAMENTO",
@@ -91,12 +133,30 @@ export default function NewNotificationScreen() {
         medias: data.medias,
       });
 
-      // O backend retorna "Notificação X com id Y Criada com sucesso!"
-      const match = resultado.response.match(/id (\d+)/);
-      const id = match ? parseInt(match[1], 10) : 0;
+      // Busca novamente as notificações do agente
+      const notificacoes = await listarNotificacoes();
 
-      setNotificacaoId(id);
-      setStep(6); // tela de sucesso
+      // Procura a notificação que acabou de ser criada
+      const notificacaoCriada = notificacoes
+        .filter(
+          (item) =>
+            item.nome === nome &&
+            item.tipo_evento === tipoEventoFinal &&
+            item.categoria === data.categoria,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime(),
+        )[0];
+
+      if (!notificacaoCriada) {
+        throw new Error(
+          "A notificação foi criada, mas não foi possível obter seu protocolo.",
+        );
+      }
+
+      setNotificacaoId(notificacaoCriada.id);
+      setStep(6);
     } catch (err) {
       Alert.alert(
         "Erro ao enviar",
@@ -121,10 +181,16 @@ export default function NewNotificationScreen() {
   return (
     <View style={styles.screen}>
       <WizardHeader
-        title={STEP_TITLES[step - 1]}
+        title="Nova notificação"
         step={step}
-        totalSteps={TOTAL_STEPS}
-        onBack={back}
+        totalSteps={6}
+        onBack={() => {
+          if (step > 1) {
+            setStep((prev) => prev - 1);
+          } else {
+            router.back();
+          }
+        }}
       />
 
       <ScrollView

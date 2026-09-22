@@ -84,13 +84,6 @@ export default function ProfileScreen() {
           <InfoRow label="CPF" value={agente?.cpf ?? "—"} />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Configurações</Text>
-          <TouchableOpacity style={styles.actionRow} activeOpacity={0.7}>
-            <Text style={styles.actionText}>Alterar senha</Text>
-            <View style={styles.chevron} />
-          </TouchableOpacity>
-        </View>
 
         <TouchableOpacity
           style={styles.logoutBtn}
