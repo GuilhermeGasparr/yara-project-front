@@ -19,17 +19,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import { Feather } from "@expo/vector-icons";
+import { Platform } from "react-native";
+import { Alert } from "react-native";
 import { router } from "expo-router";
 
-import {
-  Colors,
-  FontSize,
-  Radius,
-  Spacing,
-} from "@/constants/theme";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
-import { listarNotificacoesVE } from "@/services/VeService";
+import {
+  listarNotificacoesVE,
+  baixarRelatorioPDFVE,
+} from "@/services/VeService";
 
 import type { Notificacao } from "@/services/NotificationService";
 
@@ -59,7 +59,9 @@ function formatarStatus(status: string) {
 
     case "ENCERRADO":
       return "Encerrado";
-
+    case "PENDENTE":
+    case "EM ANDAMENTO":
+      return "Pendente";
     default:
       return status || "Não informado";
   }
@@ -153,10 +155,7 @@ function formatarData(data: string) {
   });
 }
 
-function formatarAfetados(
-  quantidade: number,
-  categoria: string,
-) {
+function formatarAfetados(quantidade: number, categoria: string) {
   if (normalizar(categoria) === "EPIZOOTIA") {
     return `${quantidade} animais afetados`;
   }
@@ -169,15 +168,11 @@ interface NotificationCardProps {
   onPress: () => void;
 }
 
-function NotificationCard({
-  item,
-  onPress,
-}: NotificationCardProps) {
+function NotificationCard({ item, onPress }: NotificationCardProps) {
   const categoria = getCategoriaStyle(item.categoria);
   const status = getStatusStyle(item.status);
 
-  const isPending =
-    normalizar(item.status) === "EM ANDAMENTO";
+  const isPending = normalizar(item.status) === "EM ANDAMENTO";
 
   return (
     <Pressable
@@ -185,11 +180,9 @@ function NotificationCard({
       style={({ pressed }) => [
         styles.notificationCard,
 
-        isPending &&
-          styles.notificationCardPending,
+        isPending && styles.notificationCardPending,
 
-        pressed &&
-          styles.notificationCardPressed,
+        pressed && styles.notificationCardPressed,
       ]}
     >
       <View style={styles.cardHeader}>
@@ -204,17 +197,13 @@ function NotificationCard({
           />
 
           <View style={styles.cardTitleContent}>
-            <Text
-              style={styles.cardTitle}
-              numberOfLines={1}
-            >
+            <Text style={styles.cardTitle} numberOfLines={1}>
               {item.tipo_evento}
             </Text>
 
             <Text style={styles.cardMeta}>
               {formatarData(item.data_envio)} ·{" "}
-              {item.municipio ||
-                "Município não informado"}
+              {item.municipio || "Município não informado"}
             </Text>
           </View>
         </View>
@@ -223,8 +212,7 @@ function NotificationCard({
           style={[
             styles.statusBadge,
             {
-              backgroundColor:
-                status.backgroundColor,
+              backgroundColor: status.backgroundColor,
             },
           ]}
         >
@@ -246,8 +234,7 @@ function NotificationCard({
           style={[
             styles.categoryBadge,
             {
-              backgroundColor:
-                categoria.background,
+              backgroundColor: categoria.background,
             },
           ]}
         >
@@ -283,42 +270,63 @@ interface DetailModalProps {
   onClose: () => void;
 }
 
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>
-        {label}
-      </Text>
+      <Text style={styles.detailLabel}>{label}</Text>
 
-      <Text style={styles.detailValue}>
-        {value || "Não informado"}
-      </Text>
+      <Text style={styles.detailValue}>{value || "Não informado"}</Text>
     </View>
   );
 }
 
-function NotificacaoDetailModal({
-  item,
-  onClose,
-}: DetailModalProps) {
-  const [visible, setVisible] =
-    useState(false);
+function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
+  const [visible, setVisible] = useState(false);
 
-  const backdropAnim =
-    useRef(new Animated.Value(0)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  const translateY =
-    useRef(new Animated.Value(40)).current;
+  const translateY = useRef(new Animated.Value(40)).current;
 
-  const scaleAnim =
-    useRef(new Animated.Value(0.96)).current;
+  const scaleAnim = useRef(new Animated.Value(0.96)).current;
+  const [exportandoPDF, setExportandoPDF] = useState(false);
 
+  async function handleExportarPDF() {
+    if (exportandoPDF) return;
+
+    try {
+      setExportandoPDF(true);
+
+      const blob = await baixarRelatorioPDFVE();
+
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "relatorio_vigilancia_estadual.pdf";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert(
+          "Relatório recebido",
+          "O PDF foi gerado, mas o salvamento no dispositivo precisa ser implementado.",
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o relatório.",
+      );
+    } finally {
+      setExportandoPDF(false);
+    }
+  }
   useEffect(() => {
     if (!item) return;
 
@@ -376,12 +384,9 @@ function NotificacaoDetailModal({
     return null;
   }
 
-  const categoria =
-    getCategoriaStyle(item.categoria);
+  const categoria = getCategoriaStyle(item.categoria);
 
-  const dataFormatada = new Date(
-    item.data_envio,
-  ).toLocaleString("pt-BR", {
+  const dataFormatada = new Date(item.data_envio).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -406,101 +411,73 @@ function NotificacaoDetailModal({
           ]}
         />
 
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={close}
-        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
 
         <Animated.View
           style={[
             styles.detailModal,
             {
               opacity: backdropAnim,
-              transform: [
-                { translateY },
-                { scale: scaleAnim },
-              ],
+              transform: [{ translateY }, { scale: scaleAnim }],
             },
           ]}
         >
           <View style={styles.detailHeader}>
             <View style={{ flex: 1 }}>
-              <View
-                style={styles.detailCategoryRow}
-              >
+              <View style={styles.detailCategoryRow}>
                 <View
                   style={[
                     styles.detailDot,
                     {
-                      backgroundColor:
-                        categoria.dot,
+                      backgroundColor: categoria.dot,
                     },
                   ]}
                 />
 
-                <Text
-                  style={
-                    styles.detailCategory
-                  }
-                >
-                  {item.categoria}
-                </Text>
+                <Text style={styles.detailCategory}>{item.categoria}</Text>
               </View>
 
-              <Text style={styles.detailTitle}>
-                {item.tipo_evento}
-              </Text>
+              <Text style={styles.detailTitle}>{item.tipo_evento}</Text>
 
               <Text style={styles.detailId}>
-                Notificação #
-                {String(item.id).padStart(
-                  4,
-                  "0",
-                )}
+                Notificação #{String(item.id).padStart(4, "0")}
               </Text>
             </View>
-
+            <TouchableOpacity
+              style={styles.exportButton}
+              onPress={handleExportarPDF}
+              disabled={exportandoPDF}
+              activeOpacity={0.8}
+            >
+              {exportandoPDF ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Feather name="download" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.closeBtn}
               onPress={close}
               activeOpacity={0.7}
             >
-              <Text
-                style={styles.closeBtnText}
-              >
-                ×
-              </Text>
+              <Text style={styles.closeBtnText}>×</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView
             style={styles.detailScroll}
-            contentContainerStyle={
-              styles.detailContent
-            }
-            showsVerticalScrollIndicator={
-              false
-            }
+            contentContainerStyle={styles.detailContent}
+            showsVerticalScrollIndicator={false}
           >
-            <View
-              style={styles.detailStatusRow}
-            >
-              <Text
-                style={
-                  styles.detailSectionTitle
-                }
-              >
-                Status
-              </Text>
+            <View style={styles.detailStatusRow}>
+              <Text style={styles.detailSectionTitle}>Status</Text>
 
               <View
                 style={[
                   styles.statusBadge,
                   {
-                    backgroundColor:
-                      getStatusStyle(
-                        item.status,
-                      ).backgroundColor,
+                    backgroundColor: getStatusStyle(item.status)
+                      .backgroundColor,
                   },
                 ]}
               >
@@ -508,109 +485,59 @@ function NotificacaoDetailModal({
                   style={[
                     styles.statusText,
                     {
-                      color:
-                        getStatusStyle(
-                          item.status,
-                        ).color,
+                      color: getStatusStyle(item.status).color,
                     },
                   ]}
                 >
-                  {formatarStatus(
-                    item.status,
-                  )}
+                  {formatarStatus(item.status)}
                 </Text>
               </View>
             </View>
 
             <View style={styles.detailSection}>
-              <Text
-                style={
-                  styles.detailSectionTitle
-                }
-              >
+              <Text style={styles.detailSectionTitle}>
                 Informações da ocorrência
               </Text>
 
-              <DetailRow
-                label="Tipo de evento"
-                value={item.tipo_evento}
-              />
+              <DetailRow label="Tipo de evento" value={item.tipo_evento} />
 
-              <DetailRow
-                label="Categoria"
-                value={item.categoria}
-              />
+              <DetailRow label="Categoria" value={item.categoria} />
 
-              <DetailRow
-                label="Data de envio"
-                value={dataFormatada}
-              />
+              <DetailRow label="Data de envio" value={dataFormatada} />
 
-              <DetailRow
-                label="Estado"
-                value={item.estado ?? ""}
-              />
+              <DetailRow label="Estado" value={item.estado ?? ""} />
 
-              <DetailRow
-                label="Município"
-                value={
-                  item.municipio ?? ""
-                }
-              />
+              <DetailRow label="Município" value={item.municipio ?? ""} />
 
               <DetailRow
                 label="Local da ocorrência"
-                value={
-                  item.local_ocorrencia
-                }
+                value={item.local_ocorrencia}
               />
 
               <DetailRow
                 label="Pessoas / animais afetados"
-                value={String(
-                  item.pessoas_animais_infectados_afetados,
-                )}
+                value={String(item.pessoas_animais_infectados_afetados)}
               />
             </View>
 
             <View style={styles.detailSection}>
-              <Text
-                style={
-                  styles.detailSectionTitle
-                }
-              >
+              <Text style={styles.detailSectionTitle}>
                 Continuidade da situação
               </Text>
 
-              <View
-                style={styles.descriptionBox}
-              >
-                <Text
-                  style={styles.descriptionText}
-                >
-                  {item.continuidade_situacao ||
-                    "Não informado."}
+              <View style={styles.descriptionBox}>
+                <Text style={styles.descriptionText}>
+                  {item.continuidade_situacao || "Não informado."}
                 </Text>
               </View>
             </View>
 
             <View style={styles.detailSection}>
-              <Text
-                style={
-                  styles.detailSectionTitle
-                }
-              >
-                Descrição detalhada
-              </Text>
+              <Text style={styles.detailSectionTitle}>Descrição detalhada</Text>
 
-              <View
-                style={styles.descriptionBox}
-              >
-                <Text
-                  style={styles.descriptionText}
-                >
-                  {item.descricao ||
-                    "Nenhuma descrição informada."}
+              <View style={styles.descriptionBox}>
+                <Text style={styles.descriptionText}>
+                  {item.descricao || "Nenhuma descrição informada."}
                 </Text>
               </View>
             </View>
@@ -624,19 +551,11 @@ function NotificacaoDetailModal({
 
           <View style={styles.detailFooter}>
             <TouchableOpacity
-              style={
-                styles.detailCloseButton
-              }
+              style={styles.detailCloseButton}
               onPress={close}
               activeOpacity={0.85}
             >
-              <Text
-                style={
-                  styles.detailCloseButtonText
-                }
-              >
-                Fechar relatório
-              </Text>
+              <Text style={styles.detailCloseButtonText}>Fechar relatório</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -646,109 +565,115 @@ function NotificacaoDetailModal({
 }
 
 export default function EstadualNotificationsScreen() {
-  const [notificacoes, setNotificacoes] =
-    useState<Notificacao[]>([]);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("TODOS");
+  const [statusFiltro, setStatusFiltro] = useState("TODOS");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [coadsFiltro, setCoadsFiltro] = useState("TODAS");
+  const [mostrarOpcoesCoads, setMostrarOpcoesCoads] = useState(false);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [selectedNotification, setSelectedNotification] =
+    useState<Notificacao | null>(null);
 
-  const [busca, setBusca] =
-    useState("");
-
-  const [categoriaFiltro, setCategoriaFiltro] =
-    useState("TODOS");
-
-  const [statusFiltro, setStatusFiltro] =
-    useState("TODOS");
-
-  const [
-    selectedNotification,
-    setSelectedNotification,
-  ] = useState<Notificacao | null>(null);
-
-  const fetchData = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        const data =
-          await listarNotificacoesVE();
-
-        setNotificacoes(data);
-      } catch (error) {
-        console.error(
-          "Erro ao carregar notificações VE:",
-          error,
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    },
-    [],
-  );
+
+      const data = await listarNotificacoesVE();
+
+      setNotificacoes(data);
+    } catch (error) {
+      console.error("Erro ao carregar notificações VE:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const notificacoesFiltradas =
-    useMemo(() => {
-      const buscaNormalizada =
-        normalizar(busca);
+  const coadsDisponiveis = useMemo(() => {
+    return [
+      ...new Set(
+        notificacoes
+          .map((item) => item.coads?.trim())
+          .filter((coads): coads is string => Boolean(coads)),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [notificacoes]);
 
-      return notificacoes.filter(
-        (item) => {
-          const categoria =
-            normalizar(item.categoria);
+  function normalizarStatusFiltro(status?: string) {
+    const valor = normalizar(status);
 
-          const status =
-            normalizar(item.status);
+    switch (valor) {
+      case "PENDENTE":
+      case "EM ANDAMENTO":
+        return "PENDENTE";
 
-          const textoBusca = normalizar(
-            `${item.tipo_evento} ${
-              item.municipio ?? ""
-            } ${item.nome ?? ""} ${
-              item.id
-            }`,
-          );
+      case "EM INVESTIGACAO":
+        return "EM INVESTIGACAO";
 
-          const correspondeBusca =
-            !buscaNormalizada ||
-            textoBusca.includes(
-              buscaNormalizada,
-            );
+      case "VERIDICO":
+      case "CONFIRMADO":
+        return "VERIDICO";
 
-          const correspondeCategoria =
-            categoriaFiltro === "TODOS" ||
-            categoria ===
-              normalizar(categoriaFiltro);
+      case "NAO VERIDICO":
+      case "DESCARTADO":
+        return "NAO VERIDICO";
 
-          const correspondeStatus =
-            statusFiltro === "TODOS" ||
-            status ===
-              normalizar(statusFiltro);
+      case "ENCERRADO":
+        return "ENCERRADO";
 
-          return (
-            correspondeBusca &&
-            correspondeCategoria &&
-            correspondeStatus
-          );
-        },
+      default:
+        return valor;
+    }
+  }
+
+  const notificacoesFiltradas = useMemo(() => {
+    const buscaNormalizada = normalizar(busca);
+
+    return notificacoes.filter((item) => {
+      const categoria = normalizar(item.categoria);
+      const status = normalizarStatusFiltro(item.status);
+
+      const textoBusca = normalizar(
+        `${item.tipo_evento} ${item.municipio ?? ""} ${
+          item.nome ?? ""
+        } ${item.id}`,
       );
-    }, [
-      notificacoes,
-      busca,
-      categoriaFiltro,
-      statusFiltro,
-    ]);
+
+      const correspondeCoads =
+        coadsFiltro === "TODAS" ||
+        normalizar(item.coads) === normalizar(coadsFiltro);
+
+      const correspondeBusca =
+        !buscaNormalizada || textoBusca.includes(buscaNormalizada);
+
+      const correspondeCategoria =
+        categoriaFiltro === "TODOS" ||
+        categoria === normalizar(categoriaFiltro);
+
+      const correspondeStatus =
+        statusFiltro === "TODOS" ||
+        status === normalizarStatusFiltro(statusFiltro);
+
+      return (
+        correspondeBusca &&
+        correspondeCategoria &&
+        correspondeStatus &&
+        correspondeCoads
+      );
+    });
+  }, [notificacoes, busca, categoriaFiltro, statusFiltro, coadsFiltro]);
 
   return (
     <View style={styles.screen}>
@@ -763,13 +688,9 @@ export default function EstadualNotificationsScreen() {
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerLabel}>
-            Vigilância Estadual
-          </Text>
+          <Text style={styles.headerLabel}>Vigilância Estadual</Text>
 
-          <Text style={styles.headerTitle}>
-            Notificações
-          </Text>
+          <Text style={styles.headerTitle}>Notificações</Text>
         </View>
       </View>
 
@@ -788,80 +709,121 @@ export default function EstadualNotificationsScreen() {
       >
         {/* Busca */}
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>
-            ⌕
-          </Text>
+          <Text style={styles.searchIcon}>⌕</Text>
 
           <TextInput
             value={busca}
             onChangeText={setBusca}
             placeholder="Buscar por evento ou município..."
-            placeholderTextColor={
-              Colors.gray400
-            }
+            placeholderTextColor={Colors.gray400}
             style={styles.searchInput}
           />
 
           {busca.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setBusca("")}
-            >
-              <Text
-                style={styles.clearSearch}
-              >
-                ×
-              </Text>
+            <TouchableOpacity onPress={() => setBusca("")}>
+              <Text style={styles.clearSearch}>×</Text>
             </TouchableOpacity>
           )}
         </View>
 
+        {/* Filtro de COADS */}
+        <View style={styles.coadsFilterContainer}>
+          <Text style={styles.filterLabel}>COADS</Text>
+
+          <Pressable
+            style={[
+              styles.coadsButton,
+              coadsFiltro !== "TODAS" && styles.coadsButtonActive,
+            ]}
+            onPress={() => setMostrarOpcoesCoads((anterior) => !anterior)}
+          >
+            <Text
+              style={[
+                styles.coadsButtonText,
+                coadsFiltro !== "TODAS" && styles.coadsButtonTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {coadsFiltro === "TODAS" ? "Todas as COADS" : coadsFiltro}
+            </Text>
+
+            <Feather
+              name={mostrarOpcoesCoads ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={coadsFiltro !== "TODAS" ? Colors.white : Colors.teal600}
+            />
+          </Pressable>
+
+          {mostrarOpcoesCoads && (
+            <View style={styles.coadsDropdown}>
+              <ScrollView
+                nestedScrollEnabled
+                style={styles.coadsDropdownScroll}
+                keyboardShouldPersistTaps="handled"
+              >
+                {["TODAS", ...coadsDisponiveis].map((coads) => {
+                  const selecionada = coadsFiltro === coads;
+
+                  return (
+                    <Pressable
+                      key={coads}
+                      style={[
+                        styles.coadsOption,
+                        selecionada && styles.coadsOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setCoadsFiltro(coads);
+                        setMostrarOpcoesCoads(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.coadsOptionText,
+                          selecionada && styles.coadsOptionTextSelected,
+                        ]}
+                      >
+                        {coads === "TODAS" ? "Todas as COADS" : coads}
+                      </Text>
+
+                      {selecionada && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal600}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
         {/* Categorias */}
-        <Text style={styles.filterLabel}>
-          Categoria
-        </Text>
+        <Text style={styles.filterLabel}>Categoria</Text>
 
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={
-            false
-          }
-          contentContainerStyle={
-            styles.filterRow
-          }
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
         >
-          {[
-            "TODOS",
-            "DOENÇA",
-            "EPIZOOTIA",
-            "DESASTRE",
-          ].map((filtro) => {
-            const active =
-              categoriaFiltro === filtro;
+          {["TODOS", "DOENÇA", "EPIZOOTIA", "DESASTRE"].map((filtro) => {
+            const active = categoriaFiltro === filtro;
 
             return (
               <TouchableOpacity
                 key={filtro}
-                onPress={() =>
-                  setCategoriaFiltro(
-                    filtro,
-                  )
-                }
-                style={[
-                  styles.filterChip,
-                  active &&
-                    styles.filterChipActive,
-                ]}
+                onPress={() => setCategoriaFiltro(filtro)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
               >
                 <Text
                   style={[
                     styles.filterChipText,
-                    active &&
-                      styles.filterChipTextActive,
+                    active && styles.filterChipTextActive,
                   ]}
                 >
-                  {filtro === "TODOS"
-                    ? "Todos"
-                    : filtro}
+                  {filtro === "TODOS" ? "Todos" : filtro}
                 </Text>
               </TouchableOpacity>
             );
@@ -869,54 +831,40 @@ export default function EstadualNotificationsScreen() {
         </ScrollView>
 
         {/* Status */}
-        <Text style={styles.filterLabel}>
-          Status
-        </Text>
+        <Text style={styles.filterLabel}>Status</Text>
 
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={
-            false
-          }
-          contentContainerStyle={
-            styles.filterRow
-          }
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
         >
           {[
             "TODOS",
-            "EM ANDAMENTO",
+            "PENDENTE",
             "EM INVESTIGAÇÃO",
             "VERÍDICO",
             "NÃO VERÍDICO",
             "ENCERRADO",
           ].map((filtro) => {
-            const active =
-              statusFiltro === filtro;
+            const active = statusFiltro === filtro;
 
             return (
               <TouchableOpacity
                 key={filtro}
-                onPress={() =>
-                  setStatusFiltro(filtro)
-                }
-                style={[
-                  styles.filterChip,
-                  active &&
-                    styles.filterChipActive,
-                ]}
+                onPress={() => setStatusFiltro(filtro)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
               >
                 <Text
                   style={[
                     styles.filterChipText,
-                    active &&
-                      styles.filterChipTextActive,
+                    active && styles.filterChipTextActive,
                   ]}
                 >
                   {filtro === "TODOS"
                     ? "Todos"
-                    : formatarStatus(
-                        filtro,
-                      )}
+                    : filtro === "PENDENTE"
+                      ? "Pendentes"
+                      : formatarStatus(filtro)}
                 </Text>
               </TouchableOpacity>
             );
@@ -925,57 +873,38 @@ export default function EstadualNotificationsScreen() {
 
         {/* Contador */}
         <View style={styles.resultsHeader}>
-          <Text style={styles.sectionLabel}>
-            Registros
-          </Text>
+          <Text style={styles.sectionLabel}>Registros</Text>
 
-          <Text style={styles.resultCount}>
-            {notificacoesFiltradas.length}
-          </Text>
+          <Text style={styles.resultCount}>{notificacoesFiltradas.length}</Text>
         </View>
 
         {/* Lista */}
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator
-              size="large"
-              color={Colors.teal400}
-            />
+            <ActivityIndicator size="large" color={Colors.teal400} />
 
-            <Text style={styles.loadingText}>
-              Carregando notificações...
-            </Text>
+            <Text style={styles.loadingText}>Carregando notificações...</Text>
           </View>
-        ) : notificacoesFiltradas.length ===
-          0 ? (
+        ) : notificacoesFiltradas.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>
-              📋
-            </Text>
+            <Text style={styles.emptyEmoji}>📋</Text>
 
             <Text style={styles.emptyTitle}>
               Nenhuma notificação encontrada
             </Text>
 
             <Text style={styles.emptyText}>
-              Tente alterar os filtros ou a
-              busca.
+              Tente alterar os filtros ou a busca.
             </Text>
           </View>
         ) : (
-          notificacoesFiltradas.map(
-            (item) => (
-              <NotificationCard
-                key={item.id}
-                item={item}
-                onPress={() =>
-                  setSelectedNotification(
-                    item,
-                  )
-                }
-              />
-            ),
-          )
+          notificacoesFiltradas.map((item) => (
+            <NotificationCard
+              key={item.id}
+              item={item}
+              onPress={() => setSelectedNotification(item)}
+            />
+          ))
         )}
 
         <View
@@ -987,9 +916,7 @@ export default function EstadualNotificationsScreen() {
 
       <NotificacaoDetailModal
         item={selectedNotification}
-        onClose={() =>
-          setSelectedNotification(null)
-        }
+        onClose={() => setSelectedNotification(null)}
       />
     </View>
   );
@@ -1015,8 +942,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor:
-      "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1027,10 +953,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderBottomWidth: 2,
     borderColor: Colors.white,
-    transform: [
-      { rotate: "45deg" },
-      { translateX: 2 },
-    ],
+    transform: [{ rotate: "45deg" }, { translateX: 2 }],
   },
 
   headerLabel: {
@@ -1058,8 +981,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor:
-      "rgba(15,110,86,0.1)",
+    borderColor: "rgba(15,110,86,0.1)",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
@@ -1121,7 +1043,102 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: Colors.white,
   },
+  exportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginRight: 10,
+    backgroundColor: "#0F6E56",
+  },
 
+  coadsFilterContainer: {
+    marginBottom: Spacing.md,
+    zIndex: 10,
+  },
+
+  coadsButton: {
+    minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.15)",
+    backgroundColor: Colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+
+  coadsButtonActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  coadsButtonText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.teal600,
+  },
+
+  coadsButtonTextActive: {
+    color: Colors.white,
+  },
+
+  coadsDropdown: {
+    marginTop: 6,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    borderRadius: Radius.md,
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+
+  coadsDropdownScroll: {
+    maxHeight: 220,
+  },
+
+  coadsOption: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.gray100,
+  },
+
+  coadsOptionSelected: {
+    backgroundColor: Colors.teal50,
+  },
+
+  coadsOptionText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+  },
+
+  coadsOptionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
+
+  exportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   resultsHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1156,8 +1173,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor:
-      "rgba(15,110,86,0.08)",
+    borderColor: "rgba(15,110,86,0.08)",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1305,8 +1321,7 @@ const styles = StyleSheet.create({
 
   modalBackdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor:
-      "rgba(5,35,29,0.55)",
+    backgroundColor: "rgba(5,35,29,0.55)",
   },
 
   detailModal: {
@@ -1443,8 +1458,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor:
-      "rgba(15,110,86,0.06)",
+    borderColor: "rgba(15,110,86,0.06)",
   },
 
   descriptionText: {

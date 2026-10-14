@@ -1,14 +1,13 @@
+import { StatsCard } from "@/components/StatsCard";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
-import { listarNotificacoesVE } from "@/services/VeService";
 import type { Notificacao } from "@/services/NotificationService";
-import EstadualStatCard from "@/components/estadual/EstadualStatCard";
+import { listarNotificacoesVE } from "@/services/VeService";
 import { gerarDashboardEstadual } from "@/utils/estadualDashboard";
-
 import Feather from "@expo/vector-icons/Feather";
+import { BarChart } from "react-native-gifted-charts";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import { baixarRelatorioPDFVE } from "@/services/VeService";
 /* ============================================================================
  * Helpers
  * ========================================================================== */
@@ -125,7 +124,7 @@ function AlertCard({
 }
 
 /* ============================================================================
- * Município
+ * Município (Agora em formato de card vertical isolado)
  * ========================================================================== */
 
 function MunicipioRow({
@@ -141,7 +140,7 @@ function MunicipioRow({
     maiorQuantidade > 0 ? Math.min(1, quantidade / maiorQuantidade) : 0;
 
   return (
-    <View style={styles.municipioRow}>
+    <View style={styles.cardItem}>
       <View style={styles.municipioHeader}>
         <View style={styles.municipioNameRow}>
           <View style={styles.municipioIcon}>
@@ -171,10 +170,10 @@ function MunicipioRow({
 }
 
 /* ============================================================================
- * Categoria
+ * Categoria (Agora em formato de card vertical isolado)
  * ========================================================================== */
 
-function CategoriaRow({
+function CategoriaBar({
   categoria,
   quantidade,
   total,
@@ -184,52 +183,38 @@ function CategoriaRow({
   total: number;
 }) {
   const chave = normalizar(categoria);
-
   const config = CATEGORIA_CFG[chave] ?? {
     label: categoria || "Não informado",
     color: Colors.gray600,
   };
 
   const percentual = total > 0 ? (quantidade / total) * 100 : 0;
+  const alturaBarra = (Math.min(percentual, 100) / 100) * 110;
 
   return (
-    <View style={styles.categoryRow}>
-      <View style={styles.categoryHeader}>
-        <View style={styles.categoryNameRow}>
-          <View
-            style={[
-              styles.categoryDot,
-              {
-                backgroundColor: config.color,
-              },
-            ]}
-          />
+    <View style={styles.categoryColumn}>
+      <Text style={styles.categoryPercentage}>{percentual.toFixed(1)}%</Text>
 
-          <Text style={styles.categoryName}>{config.label}</Text>
-        </View>
-
-        <Text style={styles.categoryValue}>{quantidade}</Text>
-      </View>
-
-      <View style={styles.categoryProgressBackground}>
+      <View style={styles.categoryBarTrack}>
         <View
           style={[
-            styles.categoryProgress,
+            styles.categoryBar,
             {
-              width: `${Math.min(percentual, 100)}%`,
+              height: alturaBarra,
               backgroundColor: config.color,
             },
           ]}
         />
       </View>
 
-      <Text style={styles.categoryPercentage}>
-        {percentual.toFixed(0)}% das notificações
+      <Text style={styles.categoryName} numberOfLines={1}>
+        {config.label}
       </Text>
+
+      <Text style={styles.categoryCount}>{quantidade} notificações</Text>
     </View>
   );
 }
-
 /* ============================================================================
  * Tela principal
  * ========================================================================== */
@@ -307,7 +292,10 @@ export default function EstadualHomeScreen() {
 
   const municipiosExibidos = municipios.slice(0, 5);
 
-  const maiorQuantidadeMunicipio = municipiosExibidos[0]?.quantidade ?? 0;
+  const maiorQuantidadeMunicipio = Math.max(
+    municipiosExibidos[0]?.quantidade ?? 0,
+    10,
+  );
 
   /* --------------------------------------------------------------------------
    * Municípios em investigação
@@ -334,7 +322,33 @@ export default function EstadualHomeScreen() {
    * ------------------------------------------------------------------------ */
 
   const temAlertas = dashboard.emInvestigacao > 0 || dashboard.pendentes > 0;
+  const categoryData = [
+    {
+      key: "DOENCA",
+      quantidade: dashboard.doencas,
+    },
+    {
+      key: "EPIZOOTIA",
+      quantidade: dashboard.epizootias,
+    },
+    {
+      key: "DESASTRE",
+      quantidade: dashboard.desastres,
+    },
+  ].map((item) => {
+    const config = CATEGORIA_CFG[item.key];
+    const percentual =
+      dashboard.total > 0 ? (item.quantidade / dashboard.total) * 100 : 0;
 
+    return {
+      value: Number(percentual.toFixed(1)),
+      label: config.label,
+      frontColor: config.color,
+      topLabelComponent: () => (
+        <Text style={styles.chartTopLabel}>{percentual.toFixed(1)}%</Text>
+      ),
+    };
+  });
   /* ==========================================================================
    * Render
    * ======================================================================== */
@@ -388,7 +402,7 @@ export default function EstadualHomeScreen() {
         }
       >
         {/* ================================================================
-         * Indicadores estaduais
+         * Indicadores estaduais (Linha Vertical)
          * ============================================================ */}
 
         <View style={styles.statsSection}>
@@ -400,26 +414,15 @@ export default function EstadualHomeScreen() {
             </View>
           ) : (
             <View style={styles.statsGrid}>
-              <EstadualStatCard value={dashboard.total} label="Total" />
-
-              <EstadualStatCard value={dashboard.pendentes} label="Pendentes" />
-
-              <EstadualStatCard
+              <StatsCard value={dashboard.total} label="Total" />
+              <StatsCard value={dashboard.pendentes} label="Pendentes" />
+              <StatsCard
                 value={dashboard.emInvestigacao}
                 label="Em investigação"
               />
-
-              <EstadualStatCard value={dashboard.veridicos} label="Verídicas" />
-
-              <EstadualStatCard
-                value={dashboard.naoVeridicos}
-                label="Não verídicas"
-              />
-
-              <EstadualStatCard
-                value={dashboard.encerrados}
-                label="Encerradas"
-              />
+              <StatsCard value={dashboard.veridicos} label="Verídicas" />
+              <StatsCard value={dashboard.naoVeridicos} label="Não verídicas" />
+              <StatsCard value={dashboard.encerrados} label="Encerradas" />
             </View>
           )}
         </View>
@@ -457,6 +460,7 @@ export default function EstadualHomeScreen() {
             </View>
           </View>
         </View>
+
         <View style={styles.sectionSpacing}>
           <SectionHeader icon="map" title="Mapa do território" />
 
@@ -485,40 +489,103 @@ export default function EstadualHomeScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        <View style={styles.sectionSpacing}>
+          <SectionHeader icon="user-plus" title="Gerenciar contas" />
+
+          <TouchableOpacity
+            style={styles.mapShortcut}
+            onPress={() => router.navigate("./createVR")}
+            activeOpacity={0.85}
+          >
+            <View style={styles.mapShortcutIcon}>
+              <Feather name="user-plus" size={21} color={Colors.teal600} />
+            </View>
+
+            <View style={styles.mapShortcutContent}>
+              <Text style={styles.mapShortcutTitle}>
+                Criar Conta Vigilância Regional
+              </Text>
+
+              <Text style={styles.mapShortcutDescription}>
+                Cadastre um novo vigilante regional vinculado a uma
+                superintendência.
+              </Text>
+            </View>
+
+            <View style={styles.mapShortcutArrow}>
+              <Feather name="chevron-right" size={20} color={Colors.gray400} />
+            </View>
+          </TouchableOpacity>
+        </View>
         {/* ================================================================
-         * Distribuição por categoria
+         * Distribuição por categoria (Linha Vertical / Cards Separados)
          * ============================================================ */}
 
         <View style={styles.sectionSpacing}>
-          <SectionHeader icon="pie-chart" title="Distribuição por categoria" />
+          <SectionHeader
+            icon="bar-chart-2"
+            title="Distribuição por categoria"
+          />
 
           {loading ? (
             <View style={styles.loadingSmall}>
               <ActivityIndicator size="small" color={Colors.teal600} />
             </View>
           ) : (
-            <View style={styles.sectionCard}>
-              <CategoriaRow
-                categoria="DOENCA"
-                quantidade={dashboard.doencas}
-                total={dashboard.total}
+            <View style={styles.categoryChart}>
+              <BarChart
+                data={categoryData}
+                barWidth={28}
+                noOfSections={4}
+                maxValue={100}
+                height={180}
+                spacing={24}
+                roundedTop
+                hideRules={false}
+                rulesColor="#E5E7EB"
+                xAxisColor="#D9E7E3"
+                yAxisColor="#D9E7E3"
+                yAxisTextStyle={styles.chartAxisText}
+                xAxisLabelTextStyle={styles.chartAxisText}
+                xAxisLabelsVerticalShift={2}
+                initialSpacing={16}
+                endSpacing={16}
+                isAnimated
               />
 
-              <View style={styles.rowDivider} />
+              <View style={styles.categoryLegend}>
+                {[
+                  {
+                    key: "DOENCA",
+                    quantidade: dashboard.doencas,
+                  },
+                  {
+                    key: "EPIZOOTIA",
+                    quantidade: dashboard.epizootias,
+                  },
+                  {
+                    key: "DESASTRE",
+                    quantidade: dashboard.desastres,
+                  },
+                ].map((item) => {
+                  const config = CATEGORIA_CFG[item.key];
 
-              <CategoriaRow
-                categoria="EPIZOOTIA"
-                quantidade={dashboard.epizootias}
-                total={dashboard.total}
-              />
+                  return (
+                    <View key={item.key} style={styles.categoryLegendItem}>
+                      <View
+                        style={[
+                          styles.categoryLegendDot,
+                          { backgroundColor: config.color },
+                        ]}
+                      />
 
-              <View style={styles.rowDivider} />
-
-              <CategoriaRow
-                categoria="DESASTRE"
-                quantidade={dashboard.desastres}
-                total={dashboard.total}
-              />
+                      <Text style={styles.categoryLegendText}>
+                        {config.label}: {item.quantidade}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           )}
         </View>
@@ -583,7 +650,7 @@ export default function EstadualHomeScreen() {
         </View>
 
         {/* ================================================================
-         * Municípios com maior atividade
+         * Municípios com maior atividade (Linha Vertical / Cards Separados)
          * ============================================================ */}
 
         <View style={styles.sectionSpacing}>
@@ -605,27 +672,18 @@ export default function EstadualHomeScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.sectionCard}>
-              {municipiosExibidos.map((item, index) => (
-                <View key={item.municipio}>
-                  <MunicipioRow
-                    municipio={item.municipio}
-                    quantidade={item.quantidade}
-                    maiorQuantidade={maiorQuantidadeMunicipio}
-                  />
-
-                  {index < municipiosExibidos.length - 1 ? (
-                    <View style={styles.rowDivider} />
-                  ) : null}
-                </View>
+            <View style={styles.verticalListContainer}>
+              {municipiosExibidos.map((item) => (
+                <MunicipioRow
+                  key={item.municipio}
+                  municipio={item.municipio}
+                  quantidade={item.quantidade}
+                  maiorQuantidade={maiorQuantidadeMunicipio}
+                />
               ))}
             </View>
           )}
         </View>
-
-        {/* ================================================================
-         * Todas as notificações
-         * ============================================================ */}
 
         {!loading && notificacoes.length > 0 ? (
           <TouchableOpacity
@@ -773,8 +831,7 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: Spacing.sm,
+    gap: Spacing.sm,
   },
 
   loadingStats: {
@@ -788,8 +845,28 @@ const styles = StyleSheet.create({
   },
 
   /* --------------------------------------------------------------------------
-   * Cards
+   * Cards / Listas Verticais Separadas
    * ------------------------------------------------------------------------ */
+
+  verticalListContainer: {
+    gap: Spacing.sm,
+  },
+
+  cardItem: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.08)",
+    padding: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
 
   sectionCard: {
     backgroundColor: Colors.white,
@@ -805,12 +882,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
-  },
-
-  rowDivider: {
-    height: 1,
-    backgroundColor: Colors.gray50,
-    marginHorizontal: Spacing.md,
   },
 
   /* --------------------------------------------------------------------------
@@ -855,10 +926,6 @@ const styles = StyleSheet.create({
    * Categorias
    * ------------------------------------------------------------------------ */
 
-  categoryRow: {
-    padding: Spacing.md,
-  },
-
   categoryHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -879,12 +946,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
-  categoryName: {
-    fontSize: FontSize.sm,
-    fontWeight: "600",
-    color: Colors.gray900,
-  },
-
   categoryValue: {
     fontSize: FontSize.sm,
     fontWeight: "700",
@@ -903,12 +964,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
 
-  categoryPercentage: {
-    marginTop: 5,
-    fontSize: 10,
-    color: Colors.gray400,
-  },
-
   /* --------------------------------------------------------------------------
    * Alertas
    * ------------------------------------------------------------------------ */
@@ -925,6 +980,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F0D9A8",
     padding: Spacing.md,
+  },
+
+  chartTopLabel: {
+    color: Colors.gray800,
+    fontSize: FontSize.xs,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+
+  chartAxisText: {
+    color: Colors.gray600,
+    fontSize: FontSize.xs,
   },
 
   alertIcon: {
@@ -947,6 +1015,7 @@ const styles = StyleSheet.create({
     color: Colors.gray900,
     marginBottom: 3,
   },
+
   mapShortcut: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
@@ -993,12 +1062,94 @@ const styles = StyleSheet.create({
     color: Colors.gray600,
   },
 
+  categoryChart: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.08)",
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
+
+  categoryLegend: {
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+    width: "100%",
+    alignSelf: "stretch",
+  },
+
+  categoryLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    width: "100%",
+  },
+
+  categoryLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+
+  categoryLegendText: {
+    color: Colors.gray800,
+    fontSize: FontSize.sm,
+    flex: 1,
+    flexShrink: 1,
+  },
+
+  categoryColumn: {
+    flex: 1,
+    alignItems: "center",
+    minWidth: 0,
+  },
+
+  categoryPercentage: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray900,
+    marginBottom: Spacing.sm,
+  },
+
+  categoryBarTrack: {
+    height: 110,
+    width: 38,
+    maxWidth: "70%",
+    backgroundColor: Colors.gray50,
+    borderRadius: Radius.sm,
+    overflow: "hidden",
+    justifyContent: "flex-end",
+  },
+
+  categoryBar: {
+    width: "100%",
+    borderTopLeftRadius: Radius.sm,
+    borderTopRightRadius: Radius.sm,
+  },
+
+  categoryName: {
+    fontSize: FontSize.xs,
+    fontWeight: "600",
+    color: Colors.gray800,
+    textAlign: "center",
+    marginTop: Spacing.sm,
+  },
+
+  categoryCount: {
+    fontSize: 10,
+    color: Colors.gray600,
+    textAlign: "center",
+    marginTop: 3,
+  },
   mapShortcutArrow: {
     width: 30,
     height: 30,
     alignItems: "center",
     justifyContent: "center",
   },
+
   alertDescription: {
     fontSize: FontSize.xs,
     lineHeight: 18,
@@ -1045,10 +1196,6 @@ const styles = StyleSheet.create({
   /* --------------------------------------------------------------------------
    * Municípios
    * ------------------------------------------------------------------------ */
-
-  municipioRow: {
-    padding: Spacing.md,
-  },
 
   municipioHeader: {
     flexDirection: "row",
@@ -1099,10 +1246,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: Colors.teal400,
   },
-
-  /* --------------------------------------------------------------------------
-   * Loading / Empty
-   * ------------------------------------------------------------------------ */
 
   loadingSmall: {
     minHeight: 100,

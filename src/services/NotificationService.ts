@@ -1,6 +1,7 @@
 import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
-const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -24,6 +25,8 @@ export interface Notificacao {
   local_ocorrencia: string;
   municipio?: string;
   estado?: string;
+  coads?: string;
+  superintendencia?: string;
   endereco?: string;
   latitude?: number;
   longitude?: number;
@@ -38,7 +41,7 @@ export interface CriarNotificacaoPayload {
   nome: string;
   tipo_evento: string;
   categoria: Categoria;
-
+  data_ocorrencia_str: string;
   pessoas_animais_infectados_afetados: number;
 
   local_ocorrencia: string;
@@ -86,6 +89,33 @@ export async function listarNotificacoes(): Promise<Notificacao[]> {
   return data["Notificações"] as Notificacao[];
 }
 
+export async function baixarRelatorioNotificacaoPDF(
+  notificacaoId: number,
+): Promise<Blob> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/agentes/notificacoes/${notificacaoId}/relatorio_pdf`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+
+  if (!res.ok) {
+    let mensagem = "Erro ao gerar relatório.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {}
+
+    throw new Error(mensagem);
+  }
+
+  return await res.blob();
+}
+
 // ─── Criar notificação ────────────────────────────────────────────────────────
 // POST /agentes/criar_notificacao  (multipart/form-data)
 
@@ -95,7 +125,7 @@ export async function criarNotificacao(
   const headers = await authHeader();
 
   const form = new FormData();
-
+  form.append("data_ocorrencia_str", payload.data_ocorrencia_str);
   form.append("nome", payload.nome);
   form.append("tipo_evento", payload.tipo_evento);
   form.append("categoria", payload.categoria);

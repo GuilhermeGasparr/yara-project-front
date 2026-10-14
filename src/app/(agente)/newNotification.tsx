@@ -126,6 +126,7 @@ export default function NewNotificationScreen() {
         endereco: data.endereco,
         estado: data.estado,
         municipio: data.municipio,
+        data_ocorrencia_str: data.data_aproximada,
         continuidade_situacao: data.continuidade_situacao,
         descricao: data.descricao || data.transcricao || "Sem descrição.",
         status: "EM ANDAMENTO",

@@ -540,7 +540,7 @@ export default function LoginScreen() {
           {/* Cabeçalho */}
           <View style={styles.header}>
             <SentinelaLogo />
-            <Text style={styles.appTitle}>Sentinela Saúde</Text>
+            <Text style={styles.appTitle}>NoteAlerta</Text>
             <Text style={styles.appSub}>
               Sistema de Notificação Comunitária
             </Text>
@@ -647,7 +647,7 @@ export default function LoginScreen() {
 
           {/* Rodapé */}
           <Text style={styles.footer}>
-            Sentinela Saúde © {new Date().getFullYear()}
+            NoteAlerta © {new Date().getFullYear()}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

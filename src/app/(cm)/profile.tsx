@@ -144,7 +144,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={styles.version}>
-          Sentinela Saúde · v1.0
+          NoteAlerta · v1.0
         </Text>
 
         <View style={{ height: Spacing.xxl }} />

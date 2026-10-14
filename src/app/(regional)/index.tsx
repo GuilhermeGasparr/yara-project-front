@@ -1,8 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import NotificationsByCategory from "@/components/regional/NotificationsByCategory";
+import RegionalAlert from "@/components/regional/RegionalAlert";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import type { Notificacao } from "@/services/NotificationService";
+import {
+  exportarRelatorioRegionalPDF,
+  listarNotificacoesRegionais,
+} from "@/services/RegionalService";
+import { gerarDashboardRegional } from "@/utils/regionalDashboard";
+import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -11,54 +24,40 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import RegionalOverview from "@/components/regional/RegionalOverview";
-import { gerarDashboardRegional } from "@/utils/regionalDashboard";
-import { router } from "expo-router";
 import NotificationsByMunicipio from "../../components/regional/NotificationsByMunicipio";
-import { useAuth } from "@/context/AuthContext";
-import { listarNotificacoesRegionais } from "@/services/RegionalService";
-import RegionalAlert from "@/components/regional/RegionalAlert";
-import type { Notificacao } from "@/services/NotificationService";
-import NotificationsByCategory from "@/components/regional/NotificationsByCategory";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+
+function normalizar(valor?: string) {
+  return (
+    valor
+      ?.trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") ?? ""
+  );
+}
 
 // ─── Configuração de status ──────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
   {
-    "EM ANDAMENTO": {
-      label: "Pendente",
-      bg: "#E4F0FD",
-      color: "#1261A0",
-    },
-
-    "EM INVESTIGAÇÃO": {
+    "EM ANDAMENTO": { label: "Pendente", bg: "#E4F0FD", color: "#1261A0" },
+    PENDENTE: { label: "Pendente", bg: "#E4F0FD", color: "#1261A0" },
+    "EM INVESTIGACAO": {
       label: "Em investigação",
       bg: "#FAEEDA",
       color: "#854F0B",
     },
-
-    VERÍDICO: {
-      label: "Verídico",
-      bg: Colors.teal50,
-      color: Colors.teal800,
-    },
-
-    "NÃO VERÍDICO": {
+    VERIDICO: { label: "Verídico", bg: Colors.teal50, color: Colors.teal800 },
+    "NAO VERIDICO": {
       label: "Não verídico",
       bg: "#FDE8E8",
       color: "#C62828",
     },
-
-    ENCERRADO: {
-      label: "Encerrado",
-      bg: Colors.gray50,
-      color: Colors.gray600,
-    },
+    ENCERRADO: { label: "Encerrado", bg: Colors.gray50, color: Colors.gray600 },
   };
 // ─── Componentes ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CFG[status] ?? {
+  const config = STATUS_CFG[normalizar(status)] ?? {
     label: status,
     bg: Colors.gray50,
     color: Colors.gray600,
@@ -89,10 +88,11 @@ function NotificacaoCard({
   item: Notificacao;
   onPress: () => void;
 }) {
+  const categoriaNorm = normalizar(item.categoria);
   const categoriaColor =
-    item.categoria === "DOENÇA"
+    categoriaNorm === "DOENCA"
       ? Colors.red400
-      : item.categoria === "EPIZOOTIA"
+      : categoriaNorm === "EPIZOOTIA"
         ? "#BA7517"
         : "#378ADD";
 
@@ -171,7 +171,7 @@ function NotificacaoDetailModal({
         minute: "2-digit",
       });
 
-  const statusConfig = STATUS_CFG[item.status] ?? {
+  const statusConfig = STATUS_CFG[normalizar(item.status)] ?? {
     label: item.status,
     bg: Colors.gray50,
     color: Colors.gray600,
@@ -293,6 +293,77 @@ export default function RegionalHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dashboard = gerarDashboardRegional(notificacoes);
+  const contagem = useMemo(() => {
+    const c = {
+      total: notificacoes.length,
+      pendentes: 0,
+      emInvestigacao: 0,
+      veridicos: 0,
+      naoVeridicos: 0,
+      encerrados: 0,
+    };
+
+    notificacoes.forEach((n) => {
+      switch (normalizar(n.status)) {
+        case "EM ANDAMENTO":
+        case "PENDENTE":
+          c.pendentes++;
+          break;
+        case "EM INVESTIGACAO":
+          c.emInvestigacao++;
+          break;
+        case "VERIDICO":
+          c.veridicos++;
+          break;
+        case "NAO VERIDICO":
+          c.naoVeridicos++;
+          break;
+        case "ENCERRADO":
+          c.encerrados++;
+          break;
+      }
+    });
+
+    return c;
+  }, [notificacoes]);
+  const [exportandoPDF, setExportandoPDF] = useState(false);
+
+  async function handleExportarPDF() {
+    try {
+      setExportandoPDF(true);
+
+      const blob = await exportarRelatorioRegionalPDF();
+
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "relatorio_regional.pdf";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+
+      Alert.alert(
+        "Relatório gerado",
+        "O PDF foi recebido. Para salvá-lo no dispositivo, é necessário implementar o compartilhamento ou salvamento nativo.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o relatório.",
+      );
+    } finally {
+      setExportandoPDF(false);
+    }
+  }
   const getInitials = (nome: string) => {
     return nome
       .trim()
@@ -328,7 +399,6 @@ export default function RegionalHomeScreen() {
     setRefreshing(true);
     carregarNotificacoes();
   }, [carregarNotificacoes]);
-
 
   // ─── Últimas notificações ─────────────────────────────────────────────────
 
@@ -381,7 +451,6 @@ export default function RegionalHomeScreen() {
         }
       >
         {/* ─── Erro ──────────────────────────────────────────────────────── */}
-
         {error && (
           <TouchableOpacity
             style={styles.errorBanner}
@@ -397,32 +466,97 @@ export default function RegionalHomeScreen() {
             <Text style={styles.errorAction}>Toque para tentar novamente</Text>
           </TouchableOpacity>
         )}
-
         {/* ─── Estatísticas ──────────────────────────────────────────────── */}
-
-        <RegionalOverview
-          total={dashboard.total}
-          emInvestigacao={dashboard.emInvestigacao}
-          veridicos={dashboard.veridicos}
-          municipiosAtivos={dashboard.municipiosAtivos}
-        />
+        {/* ─── Estatísticas ───────────────────────────────────────────── */}
+        {loading ? (
+          <View style={styles.loadingStats}>
+            <ActivityIndicator color={Colors.teal400} />
+          </View>
+        ) : (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <StatsCard value={contagem.total} label="Total notif." />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard value={contagem.pendentes} label="Pendentes" />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard
+                value={contagem.emInvestigacao}
+                label="Em investigação"
+              />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard value={contagem.veridicos} label="Verídicas" />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard value={contagem.naoVeridicos} label="Não verídicas" />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard value={contagem.encerrados} label="Encerradas" />
+            </View>
+          </View>
+        )}
         <RegionalAlert
           emInvestigacao={dashboard.emInvestigacao}
           municipiosEmInvestigacao={dashboard.municipiosEmInvestigacao}
         />
+
+        {/* ─── Criar conta Coordenador Municipal ─────────────────────────── */}
+        <TouchableOpacity
+          style={styles.createCMButton}
+          onPress={() => router.navigate("./createCM")}
+          activeOpacity={0.85}
+        >
+          <View style={styles.createCMIconWrap}>
+            <Feather name="user-plus" size={18} color={Colors.teal600} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.createCMTitle}>
+              Criar Conta Coordenador Municipal
+            </Text>
+            <Text style={styles.createCMSub}>
+              Cadastre um novo coordenador para um município
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={20} color={Colors.gray400} />
+        </TouchableOpacity>
+
         <NotificationsByMunicipio data={dashboard.porMunicipio} />
         <NotificationsByCategory
           data={dashboard.porCategoria}
           total={dashboard.total}
         />
-        {/* ─── Conteúdo ──────────────────────────────────────────────────── */}
-
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Notificações da regional</Text>
 
-          <TouchableOpacity onPress={() => router.navigate("./notificacoes")}>
-            <Text style={styles.seeAll}>Ver todas</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <TouchableOpacity
+              onPress={handleExportarPDF}
+              disabled={exportandoPDF}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                opacity: exportandoPDF ? 0.6 : 1,
+              }}
+            >
+              {exportandoPDF ? (
+                <ActivityIndicator size="small" color={Colors.teal600} />
+              ) : (
+                <Feather name="download" size={16} color={Colors.teal600} />
+              )}
+
+              <Text style={styles.seeAll}>
+                {exportandoPDF ? "Gerando..." : "Exportar PDF"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => router.navigate("./notificacoes")}>
+              <Text style={styles.seeAll}>Ver todas</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading ? (
@@ -452,7 +586,6 @@ export default function RegionalHomeScreen() {
             />
           ))
         )}
-
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
@@ -547,9 +680,56 @@ const styles = StyleSheet.create({
 
   statsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 
+  statItem: {
+    width: "31%",
+  },
+
+  loadingStats: {
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  createCMButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.teal600,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+
+  createCMIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.teal50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  createCMTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray800,
+  },
+
+  createCMSub: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
+  },
   statCard: {
     flex: 1,
     backgroundColor: Colors.white,

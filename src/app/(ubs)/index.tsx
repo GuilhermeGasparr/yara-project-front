@@ -1,500 +1,573 @@
+import { NotificationRow } from "@/components/NotificationRow";
+import { QuickActionButton } from "@/components/QuickActionbutton";
+import { StatsCard } from "@/components/StatsCard";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { useFocusEffect } from "expo-router";
 import {
-  buscarDadosUBS,
-  listarNotificacoesUBS,
-  setEmInvestigacao,
-  setEncerrado,
-  setNaoVeridico,
-  setVeridico,
-  DadosUBS,
+  listarNotificacoes,
+  Notificacao,
   NotificacaoStatus,
-  NotificacaoUBS,
-} from "@/services/UbsService";
-import { UBSUser } from "@/types";
-import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+  baixarRelatorioNotificacaoPDF,
+} from "@/services/NotificationService";
+import { AgenteUser, UBSUser } from "@/types";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Feather } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Modal,
+  FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-// ─── Configurações de status ───────────────────────────────────────────────────
+import { useLocalSearchParams } from "expo-router";
+import { listarNotificacoesUBS } from "@/services/UbsService";
 
-const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
-  {
-    "EM ANDAMENTO": {
-      label: "Pendente",
-      bg: "#E4F0FD",
-      color: "#1261A0",
-    },
-
-    "EM INVESTIGAÇÃO": {
-      label: "Em investigação",
-      bg: "#FAEEDA",
-      color: "#854F0B",
-    },
-
-    VERÍDICO: {
-      label: "Verídico",
-      bg: Colors.teal50,
-      color: Colors.teal800,
-    },
-
-    "NÃO VERÍDICO": {
-      label: "Não verídico",
-      bg: "#FDE8E8",
-      color: "#C62828",
-    },
-
-    ENCERRADO: {
-      label: "Encerrado",
-      bg: Colors.gray50,
-      color: Colors.gray600,
-    },
-  };
-
-const CATEGORIA_COLOR: Record<string, string> = {
-  DOENÇA: Colors.red400,
-  EPIZOOTIA: "#BA7517",
-  DESASTRE: "#378ADD",
-};
-
-// ─── Componentes auxiliares ───────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: NotificacaoStatus }) {
-  const cfg = STATUS_CFG[status] ?? STATUS_CFG["EM ANDAMENTO"];
-  return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
-    </View>
-  );
+function getSaudacao() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia,";
+  if (h < 18) return "Boa tarde,";
+  return "Boa noite,";
 }
 
-function StatsCard({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statNum}>{value}</Text>
-      <Text style={styles.statLbl}>{label}</Text>
-    </View>
-  );
+function contarStatus(list: Notificacao[], status: NotificacaoStatus) {
+  return list.filter((n) => n.status === status).length;
 }
 
-// ─── Card de notificação ──────────────────────────────────────────────────────
-
-interface NotifCardProps {
-  item: NotificacaoUBS;
-  onPress: () => void;
+function getInitials(nome: string): string {
+  return nome
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0].toUpperCase())
+    .slice(0, 2)
+    .join("");
 }
 
-function NotifCard({ item, onPress }: NotifCardProps) {
-  const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
-  const isPending = item.status === "EM ANDAMENTO";
+// ─── Ícones ───────────────────────────────────────────────────────────────────
 
-  const dataFormatada = new Date(item.data_envio).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+function PlusIcon() {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.notifCard,
-        isPending && styles.notifCardPending,
-        pressed && styles.notifCardPressed,
-      ]}
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      {/* Header */}
-      <View style={styles.notifHeader}>
-        <View style={styles.notifTitleRow}>
-          <View style={[styles.notifDot, { backgroundColor: dotColor }]} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.notifTitle} numberOfLines={1}>
-              {item.tipo_evento}
-            </Text>
-
-            <Text style={styles.notifMeta}>
-              {dataFormatada} · {item.local_ocorrencia}
-            </Text>
-          </View>
-        </View>
-
-        <StatusBadge status={item.status} />
-      </View>
-
-      {/* Info */}
-      <Text style={styles.notifInfo}>
-        {item.pessoas_animais_infectados_afetados} afetados · #
-        {String(item.id).padStart(4, "0")}
-      </Text>
-
-      {/* Ações */}
-    </Pressable>
-  );
-}
-
-interface NotifDetailModalProps {
-  item: NotificacaoUBS | null;
-  onClose: () => void;
-  onStatusChange: (id: number, novoStatus: NotificacaoStatus) => Promise<void>;
-  loadingId: number | null;
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-
-      <Text style={styles.detailValue}>{value || "Não informado"}</Text>
+      <View
+        style={{
+          position: "absolute",
+          width: 2,
+          height: 18,
+          backgroundColor: Colors.white,
+          borderRadius: 1,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          height: 2,
+          width: 18,
+          backgroundColor: Colors.white,
+          borderRadius: 1,
+        }}
+      />
     </View>
   );
 }
 
-function NotifDetailModal({
-  item,
-  onClose,
-  onStatusChange,
-  loadingId,
-}: NotifDetailModalProps) {
-  const [visible, setVisible] = useState(false);
-  const backdropAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(40)).current;
-  const scaleAnim = useRef(new Animated.Value(0.96)).current;
+function UserPlusIcon() {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Feather name="user-plus" size={18} color={Colors.white} />
+    </View>
+  );
+}
 
-  useEffect(() => {
-    if (item) {
-      setVisible(true);
+function CalendarIcon() {
+  return (
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        borderWidth: 1.8,
+        borderColor: Colors.teal600,
+        borderRadius: 4,
+        alignItems: "center",
+        justifyContent: "flex-end",
+        paddingBottom: 2,
+      }}
+    >
+      <View style={{ flexDirection: "row", gap: 3 }}>
+        {[0, 1, 2].map((i) => (
+          <View
+            key={i}
+            style={{
+              width: 3,
+              height: 3,
+              backgroundColor: Colors.teal600,
+              borderRadius: 1,
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
-      Animated.parallel([
-        Animated.timing(backdropAnim, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          damping: 18,
-          stiffness: 180,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          damping: 18,
-          stiffness: 180,
-        }),
-      ]).start();
-    }
-  }, [item]);
+function MapFoldIcon() {
+  return (
+    <View
+      style={{
+        width: 20,
+        height: 18,
+        borderWidth: 1.8,
+        borderColor: Colors.teal600,
+        borderRadius: 3,
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 7,
+          width: 1.5,
+          backgroundColor: Colors.teal600,
+        }}
+      />
+    </View>
+  );
+}
 
-  function close() {
-    Animated.parallel([
-      Animated.timing(backdropAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 30,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.97,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setVisible(false);
-      onClose();
-    });
+function formatarData(data: string) {
+  if (!data) {
+    return "Data não informada";
   }
 
-  if (!item || !visible) return null;
+  const date = new Date(data);
 
-  const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
+  if (Number.isNaN(date.getTime())) {
+    return data;
+  }
 
-  const dataFormatada = new Date(item.data_envio).toLocaleString("pt-BR", {
+  return (
+    date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }) +
+    " • " +
+    date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  );
+}
+
+function formatarAfetados(quantidade: number, categoria: string) {
+  if (categoria === "EPIZOOTIA") {
+    return `${quantidade} animais afetados`;
+  }
+
+  return `${quantidade} pessoas afetadas`;
+}
+
+function formatarCategoria(categoria: string) {
+  switch (categoria) {
+    case "DOENÇA":
+      return "Doença";
+
+    case "EPIZOOTIA":
+      return "Epizootia";
+
+    case "DESASTRE":
+      return "Desastre";
+
+    case "EM INVESTIGAÇÃO":
+      return "Em investigação";
+
+    default:
+      return categoria;
+  }
+}
+
+function formatarStatus(status: string) {
+  switch (status) {
+    case "EM ANDAMENTO":
+      return "Pendente";
+
+    case "EM INVESTIGAÇÃO":
+      return "Em investigação";
+
+    case "VERÍDICO":
+      return "Verídico";
+
+    case "NÃO VERÍDICO":
+      return "Não verídico";
+
+    case "ENCERRADO":
+      return "Encerrado";
+
+    default:
+      return status;
+  }
+}
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case "EM INVESTIGAÇÃO":
+      return {
+        backgroundColor: "#FFF0D8",
+        color: "#A15C00",
+      };
+
+    case "VERÍDICO":
+      return {
+        backgroundColor: "#DDF3EC",
+        color: "#007C68",
+      };
+
+    case "NÃO VERÍDICO":
+      return {
+        backgroundColor: "#FDE8E8",
+        color: "#C62828",
+      };
+
+    case "EM ANDAMENTO":
+      return {
+        backgroundColor: "#E4F0FD",
+        color: "#1261A0",
+      };
+
+    case "ENCERRADO":
+      return {
+        backgroundColor: "#F0EEE9",
+        color: "#77736A",
+      };
+
+    default:
+      return {
+        backgroundColor: Colors.gray100,
+        color: Colors.gray600,
+      };
+  }
+}
+
+function formatarDataCompleta(data: string) {
+  if (!data) return "Data não informada";
+
+  const date = new Date(data);
+
+  if (Number.isNaN(date.getTime())) return data;
+
+  return date.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
 
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={close}
-    >
-      <View style={styles.modalRoot}>
-        {/* Backdrop */}
-        <Animated.View
-          style={[
-            styles.modalBackdrop,
-            {
-              opacity: backdropAnim,
-            },
-          ]}
-        />
-
-        {/* Clique fora fecha */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-
-        <Animated.View
-          style={[
-            styles.detailModal,
-            {
-              opacity: backdropAnim,
-              transform: [{ translateY }, { scale: scaleAnim }],
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.detailHeader}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.detailCategoryRow}>
-                <View
-                  style={[styles.detailDot, { backgroundColor: dotColor }]}
-                />
-
-                <Text style={styles.detailCategory}>{item.categoria}</Text>
-              </View>
-
-              <Text style={styles.detailTitle}>{item.tipo_evento}</Text>
-
-              <Text style={styles.detailId}>
-                Notificação #{String(item.id).padStart(4, "0")}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={close}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.closeBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={styles.detailScroll}
-            contentContainerStyle={styles.detailContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Status */}
-            <View style={styles.detailStatusRow}>
-              <Text style={styles.detailSectionTitle}>Status</Text>
-
-              <StatusBadge status={item.status} />
-            </View>
-            <View style={styles.detailSection}>
-              <Text style={styles.detailSectionTitle}>Alterar status</Text>
-
-              <View style={styles.statusActionsGrid}>
-                {[
-                  {
-                    label: "✓ Verídico",
-                    status: "VERÍDICO" as NotificacaoStatus,
-                    bg: Colors.teal50,
-                    border: Colors.teal100,
-                    color: Colors.teal800,
-                  },
-                  {
-                    label: "⟳ Em investigação",
-                    status: "EM INVESTIGAÇÃO" as NotificacaoStatus,
-                    bg: "#FAEEDA",
-                    border: "#FAC775",
-                    color: "#854F0B",
-                  },
-                  {
-                    label: "✗ Não verídico",
-                    status: "NÃO VERÍDICO" as NotificacaoStatus,
-                    bg: "#FDE8E8",
-                    border: "#F7C1C1",
-                    color: "#C62828",
-                  },
-                  {
-                    label: "■ Encerrado",
-                    status: "ENCERRADO" as NotificacaoStatus,
-                    bg: "#F0EEE9",
-                    border: "#D9D5CC",
-                    color: Colors.gray600,
-                  },
-                ].map((acao) => {
-                  const isActive = item.status === acao.status;
-                  const isLoading = loadingId === item.id;
-
-                  return (
-                    <TouchableOpacity
-                      key={acao.status}
-                      style={[
-                        styles.statusActionButton,
-                        {
-                          backgroundColor: acao.bg,
-                          borderColor: acao.border,
-                        },
-                        isActive && styles.statusActionButtonActive,
-                      ]}
-                      onPress={() => onStatusChange(item.id, acao.status)}
-                      disabled={isLoading || isActive}
-                      activeOpacity={0.8}
-                    >
-                      {isLoading && !isActive ? (
-                        <ActivityIndicator size="small" color={acao.color} />
-                      ) : (
-                        <Text
-                          style={[
-                            styles.statusActionText,
-                            {
-                              color: isActive ? Colors.white : acao.color,
-                            },
-                          ]}
-                        >
-                          {acao.label}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-            {/* Informações principais */}
-            <View style={styles.detailSection}>
-              <Text style={styles.detailSectionTitle}>
-                Informações da ocorrência
-              </Text>
-
-              <DetailRow label="Tipo de evento" value={item.tipo_evento} />
-
-              <DetailRow label="Categoria" value={item.categoria} />
-
-              <DetailRow label="Data de envio" value={dataFormatada} />
-
-              <DetailRow
-                label="Local da ocorrência"
-                value={item.local_ocorrencia}
-              />
-
-              <DetailRow
-                label="Pessoas / animais afetados"
-                value={String(item.pessoas_animais_infectados_afetados)}
-              />
-            </View>
-
-            {/* Situação */}
-            <View style={styles.detailSection}>
-              <Text style={styles.detailSectionTitle}>
-                Continuidade da situação
-              </Text>
-
-              <View style={styles.descriptionBox}>
-                <Text style={styles.descriptionText}>
-                  {item.continuidade_situacao || "Não informado."}
-                </Text>
-              </View>
-            </View>
-
-            {/* Descrição */}
-            <View style={styles.detailSection}>
-              <Text style={styles.detailSectionTitle}>Descrição detalhada</Text>
-
-              <View style={styles.descriptionBox}>
-                <Text style={styles.descriptionText}>
-                  {item.descricao || "Nenhuma descrição informada."}
-                </Text>
-              </View>
-            </View>
-
-            {/* Agente */}
-            <View style={styles.detailSection}>
-              <Text style={styles.detailSectionTitle}>Origem</Text>
-
-              <DetailRow
-                label="Agente responsável"
-                value={item.acs_ace_nome ?? "Não informado"}
-              />
-            </View>
-
-            <View style={{ height: Spacing.xl }} />
-          </ScrollView>
-          {/* Footer */}
-          <View style={styles.detailFooter}>
-            <TouchableOpacity
-              style={styles.detailCloseButton}
-              onPress={close}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.detailCloseButtonText}>Fechar relatório</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
   );
 }
 
-// ─── Tela principal ───────────────────────────────────────────────────────────
+function NotificacaoDetailModal({
+  item,
+  onClose,
+}: {
+  item: Notificacao | null;
+  onClose: () => void;
+}) {
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+
+  if (!item) return null;
+
+  const notificacaoId = item.id;
+  const statusStyle = getStatusStyle(item.status);
+
+  async function handleBaixarRelatorio() {
+    if (baixandoRelatorio) return;
+
+    try {
+      setBaixandoRelatorio(true);
+
+      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = `notificacao_${notificacaoId}.pdf`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível baixar o relatório.",
+      );
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  }
+
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        {/* CABEÇALHO */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderInfo}>
+            <Text style={styles.modalCategory}>
+              {formatarCategoria(item.categoria)}
+            </Text>
+
+            <Text style={styles.modalTitle}>
+              {item.nome || item.tipo_evento}
+            </Text>
+
+            <Text style={styles.modalProtocol}>
+              Notificação #{String(item.id).padStart(4, "0")}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleBaixarRelatorio}
+            style={styles.downloadModalBtn}
+            disabled={baixandoRelatorio}
+            activeOpacity={0.7}
+          >
+            {baixandoRelatorio ? (
+              <ActivityIndicator size="small" color={Colors.teal600} />
+            ) : (
+              <Feather name="download" size={20} color={Colors.teal600} />
+            )}
+          </TouchableOpacity>
+
+          <Pressable
+            style={styles.modalCloseButton}
+            onPress={onClose}
+            hitSlop={10}
+          >
+            <Feather name="x" size={20} color={Colors.gray600} />
+          </Pressable>
+        </View>
+
+        {/* CONTEÚDO */}
+        <FlatList
+          data={[1]}
+          keyExtractor={() => "details"}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.modalContent}
+          renderItem={() => (
+            <>
+              {/* STATUS */}
+              <View
+                style={[
+                  styles.modalStatus,
+                  {
+                    backgroundColor: statusStyle.backgroundColor,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modalStatusText,
+                    {
+                      color: statusStyle.color,
+                    },
+                  ]}
+                >
+                  {formatarStatus(item.status)}
+                </Text>
+              </View>
+
+              {/* INFORMAÇÕES */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>
+                  Informações da notificação
+                </Text>
+
+                <DetailRow
+                  label="Município"
+                  value={item.municipio ?? "Não informado"}
+                />
+
+                <DetailRow
+                  label="Tipo de evento"
+                  value={item.tipo_evento || "Não informado"}
+                />
+
+                <DetailRow
+                  label="Categoria"
+                  value={formatarCategoria(item.categoria)}
+                />
+
+                <DetailRow
+                  label="Data de envio"
+                  value={formatarDataCompleta(item.data_envio)}
+                />
+
+                <DetailRow
+                  label="Local da ocorrência"
+                  value={item.local_ocorrencia || "Não informado"}
+                />
+
+                <DetailRow
+                  label="Pessoas/animais afetados"
+                  value={formatarAfetados(
+                    item.pessoas_animais_infectados_afetados,
+                    item.categoria,
+                  )}
+                />
+              </View>
+
+              {/* CONTINUIDADE */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>
+                  Continuidade da situação
+                </Text>
+
+                <Text style={styles.detailDescription}>
+                  {item.continuidade_situacao || "Não informado"}
+                </Text>
+              </View>
+
+              {/* DESCRIÇÃO */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Descrição</Text>
+
+                <Text style={styles.detailDescription}>
+                  {item.descricao || "Não informado"}
+                </Text>
+              </View>
+
+              {/* ENDEREÇO */}
+              {item.endereco && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Endereço</Text>
+
+                  <Text style={styles.detailDescription}>{item.endereco}</Text>
+                </View>
+              )}
+
+              {/* LOCALIZAÇÃO */}
+              {(item.latitude != null || item.longitude != null) && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Localização</Text>
+
+                  <DetailRow
+                    label="Latitude"
+                    value={
+                      item.latitude != null
+                        ? String(item.latitude)
+                        : "Não informado"
+                    }
+                  />
+
+                  <DetailRow
+                    label="Longitude"
+                    value={
+                      item.longitude != null
+                        ? String(item.longitude)
+                        : "Não informado"
+                    }
+                  />
+                </View>
+              )}
+            </>
+          )}
+        />
+
+        <Pressable style={styles.modalFooterButton} onPress={onClose}>
+          <Text style={styles.modalFooterButtonText}>Fechar relatório</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function BellIcon() {
+  return (
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Feather name="bell" size={18} color={Colors.teal600} />
+    </View>
+  );
+}
+
+// ─── Tela ─────────────────────────────────────────────────────────────────────
 
 export default function UbsHomeScreen() {
   const { user } = useAuth();
-  const ubsUser = user as UBSUser;
+  const ubs = user as UBSUser;
+  const [notificacaoSelecionada, setNotificacaoSelecionada] =
+    useState<Notificacao | null>(null);
+  const router = useRouter();
 
-  const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [selectedNotification, setSelectedNotification] =
-    useState<NotificacaoUBS | null>(null);
 
-  // ─── Stats derivadas ─────────────────────────────────────────────────────────
-  const [dadosUBS, setDadosUBS] = useState<DadosUBS | null>(null);
-
-  useEffect(() => {
-    async function carregarDadosUBS() {
-      try {
-        const dados = await buscarDadosUBS();
-        setDadosUBS(dados);
-      } catch (error) {
-        console.error("Erro ao carregar dados da UBS:", error);
-      }
-    }
-
-    carregarDadosUBS();
-  }, []);
   const stats = useMemo(
     () => ({
       total: notificacoes.length,
-
-      investigacao: notificacoes.filter((n) => n.status === "EM INVESTIGAÇÃO")
-        .length,
-
-      veridicos: notificacoes.filter((n) => n.status === "VERÍDICO").length,
-
-      naoVeridicos: notificacoes.filter((n) => n.status === "NÃO VERÍDICO")
-        .length,
-
-      encerrados: notificacoes.filter((n) => n.status === "ENCERRADO").length,
+      pendentes: contarStatus(notificacoes, "EM ANDAMENTO"),
+      investigacao: contarStatus(notificacoes, "EM INVESTIGAÇÃO"),
+      veridicos: contarStatus(notificacoes, "VERÍDICO"),
+      naoVeridicos: contarStatus(notificacoes, "NÃO VERÍDICO"),
+      encerradas: contarStatus(notificacoes, "ENCERRADO"),
     }),
     [notificacoes],
   );
-  // ─── Fetch ───────────────────────────────────────────────────────────────────
+
+  const recentes = useMemo(
+    () =>
+      [...notificacoes]
+        .sort(
+          (a, b) =>
+            new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime(),
+        )
+        .slice(0, 3),
+    [notificacoes],
+  );
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
@@ -512,60 +585,11 @@ export default function UbsHomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // ─── Ações ───────────────────────────────────────────────────────────────────
-
-  async function handleStatusChange(id: number, novoStatus: NotificacaoStatus) {
-    setLoadingId(id);
-
-    try {
-      switch (novoStatus) {
-        case "EM INVESTIGAÇÃO":
-          await setEmInvestigacao(id);
-          break;
-
-        case "VERÍDICO":
-          await setVeridico(id);
-          break;
-
-        case "NÃO VERÍDICO":
-          await setNaoVeridico(id);
-          break;
-
-        case "ENCERRADO":
-          await setEncerrado(id);
-          break;
-
-        case "EM ANDAMENTO":
-          return;
-      }
-
-      setNotificacoes((prev) =>
-        prev.map((notificacao) =>
-          notificacao.id === id
-            ? { ...notificacao, status: novoStatus }
-            : notificacao,
-        ),
-      );
-
-      setSelectedNotification((prev) =>
-        prev && prev.id === id ? { ...prev, status: novoStatus } : prev,
-      );
-    } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error
-          ? err.message
-          : "Não foi possível alterar o status.",
-      );
-    } finally {
-      setLoadingId(null);
-    }
-  }
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   return (
     <View style={styles.screen}>
@@ -573,23 +597,19 @@ export default function UbsHomeScreen() {
 
       {/* Topbar */}
       <View style={styles.topbar}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.appLabel}>Unidade de Saúde</Text>
-          <Text style={styles.topbarTitle} numberOfLines={1}>
-            {dadosUBS?.nome ?? "UBS"}
-          </Text>
+        <View>
+          <Text style={styles.appLabel}>Sentinela Saúde</Text>
+          <Text style={styles.topbarTitle}>Início</Text>
         </View>
-
-        {/* Perfil */}
         <TouchableOpacity
           style={styles.profileBtn}
-          onPress={() => router.push("/(ubs)/profile")}
+          onPress={() => router.push("./profile")}
           activeOpacity={0.8}
           hitSlop={8}
         >
           <View style={styles.profileBtnInner}>
             <Text style={styles.profileBtnText}>
-              {ubsUser?.nome ? ubsUser.nome[0].toUpperCase() : "U"}
+              {user?.nome ? getInitials(user.nome) : "AG"}
             </Text>
           </View>
         </TouchableOpacity>
@@ -608,73 +628,118 @@ export default function UbsHomeScreen() {
           />
         }
       >
-
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <StatsCard value={stats.total} label="Total" />
-
-          <StatsCard value={stats.investigacao} label="Em investigação" />
-
-          <StatsCard value={stats.veridicos} label="Verídicas" />
-
-          <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
-
-          <StatsCard value={stats.encerrados} label="Encerradas" />
+        {/* Saudação */}
+        <View style={styles.greetingBlock}>
+          <Text style={styles.greetingSub}>{getSaudacao()}</Text>
+          <Text style={styles.greetingName}>
+            {ubs?.nome ?? "Agente"} · {ubs?.municipio ?? "UBS"}
+          </Text>
         </View>
-        {/* Lista */}
-        <Text style={styles.sectionLabel}>Notificações do território</Text>
 
+        {/* Stats em duas colunas */}
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={Colors.teal400} size="large" />
-            <Text style={styles.loadingText}>Carregando notificações...</Text>
-          </View>
-        ) : notificacoes.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>📋</Text>
-            <Text style={styles.emptyText}>
-              Nenhuma notificação recebida ainda.
-            </Text>
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={Colors.teal400} />
           </View>
         ) : (
-          notificacoes.map((item) => (
-            <NotifCard
-              key={item.id}
-              item={item}
-              onPress={() => setSelectedNotification(item)}
-            />
-          ))
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <StatsCard value={stats.total} label="Total notif." />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.pendentes} label="Pendentes" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.investigacao} label="Em investigação" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.veridicos} label="Verídicas" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
+            </View>
+
+            <View style={styles.statItem}>
+              <StatsCard value={stats.encerradas} label="Encerradas" />
+            </View>
+          </View>
         )}
 
-        <View style={{ height: Spacing.xxl }} />
+        {/* Ações rápidas */}
+        <QuickActionButton
+          label="Criar Agente"
+          sublabel="Cadastrar novo ACS ou ACE"
+          icon={<UserPlusIcon />}
+          onPress={() => router.navigate("./createAgent")}
+          primary
+          style={styles.primaryBtn}
+        />
+
+        <View style={styles.gridRow}>
+          <QuickActionButton
+            label="Notificações"
+            sublabel="Ver todas as ocorrências"
+            icon={<BellIcon />}
+            onPress={() => router.navigate("./notificacoes")}
+            style={styles.gridItem}
+          />
+        </View>
+
+        {/* Feed */}
+        <Text style={styles.sectionLabel}>Atualizações recentes</Text>
+
+        <View style={styles.feedCard}>
+          {loading ? (
+            <View style={styles.feedCenter}>
+              <ActivityIndicator color={Colors.teal400} />
+            </View>
+          ) : recentes.length === 0 ? (
+            <View style={styles.feedCenter}>
+              <Text style={styles.feedEmpty}>
+                Nenhuma notificação ainda.{"\n"}
+                Toque em{" "}
+                <Text style={{ fontWeight: "700" }}>Notificações</Text> para
+                acompanhar.
+              </Text>
+            </View>
+          ) : (
+            recentes.map((item) => (
+              <NotificationRow
+                key={item.id}
+                item={item}
+                onPress={() => setNotificacaoSelecionada(item)}
+              />
+            ))
+          )}
+        </View>
+
+        {recentes.length > 0 && (
+          <TouchableOpacity
+            style={styles.verTodasBtn}
+            onPress={() => router.navigate("./notificacoes")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.verTodasText}>Ver todas as notificações →</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={{ height: Spacing.xl }} />
       </ScrollView>
 
-      {/* FAB — criar agente */}
-      <TouchableOpacity
-        style={fabStyles.fab}
-        onPress={() => router.push("/(ubs)/createAgent")}
-        activeOpacity={0.88}
-      >
-        <Text style={fabStyles.fabIcon}>＋</Text>
-        <Text style={fabStyles.fabLabel}>Novo agente</Text>
-      </TouchableOpacity>
-
-      <NotifDetailModal
-        item={selectedNotification}
-        onClose={() => setSelectedNotification(null)}
-        onStatusChange={handleStatusChange}
-        loadingId={loadingId}
+      <NotificacaoDetailModal
+        item={notificacaoSelecionada}
+        onClose={() => setNotificacaoSelecionada(null)}
       />
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
-
-  // Topbar
   topbar: {
     backgroundColor: Colors.teal600,
     paddingTop: 52,
@@ -695,292 +760,118 @@ const styles = StyleSheet.create({
     color: Colors.white,
     letterSpacing: -0.3,
   },
-  profileBtn: { paddingBottom: 2 },
-  profileBtnInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
+
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.35)",
-  },
-  profileBtnText: {
-    fontSize: FontSize.base,
-    fontWeight: "700",
-    color: Colors.white,
-  },
-
-  // Scroll
-  scroll: { flex: 1 },
-  content: { padding: Spacing.lg },
-
-  // Alert banner
-  alertBanner: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-    backgroundColor: "#FAEEDA",
-    borderLeftWidth: 3,
-    borderLeftColor: "#BA7517",
-    borderRadius: Radius.sm,
     padding: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  alertIcon: { fontSize: 16, color: "#BA7517" },
-  alertText: {
-    flex: 1,
-    fontSize: FontSize.sm,
-    color: "#854F0B",
-    lineHeight: 20,
+    zIndex: 1000,
+    elevation: 10,
   },
 
-  // Stats
-  statsRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.1)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  statNum: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.teal600,
-    letterSpacing: -0.5,
-  },
-  statLbl: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
-
-  // Section label
-  sectionLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: "700",
-    color: Colors.gray400,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: Spacing.md,
-  },
-
-  // Notif card
-  notifCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.08)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  notifCardPending: {
-    borderLeftWidth: 3,
-    borderLeftColor: "#BA7517",
-  },
-  notifHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  notifTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.sm,
-    flex: 1,
-  },
-  notifDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 5,
-    flexShrink: 0,
-  },
-  notifTitle: {
-    fontSize: FontSize.base,
-    fontWeight: "600",
-    color: Colors.gray900,
-  },
-  notifMeta: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
-  notifInfo: {
-    fontSize: FontSize.xs,
-    color: Colors.gray400,
-    marginBottom: Spacing.md,
-    marginLeft: 20,
-  },
-
-  // Badges
-  badge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  badgeText: { fontSize: 10, fontWeight: "600" },
-
-  // Loading / empty
-  loadingWrap: {
-    paddingVertical: Spacing.xxl,
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  loadingText: { fontSize: FontSize.sm, color: Colors.gray400 },
-  emptyWrap: {
-    paddingVertical: Spacing.xxl,
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  emptyEmoji: { fontSize: 40 },
-  emptyText: { fontSize: FontSize.sm, color: Colors.gray400 },
-
-  notifCardPressed: {
-    transform: [{ scale: 0.985 }],
-    opacity: 0.92,
-  },
-
-  modalRoot: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: Spacing.lg,
-  },
-
-  modalBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(5, 35, 29, 0.55)",
-  },
-
-  detailModal: {
+  modalCard: {
     width: "100%",
-    maxWidth: 620,
-    maxHeight: "88%",
+    maxWidth: 520,
+    maxHeight: "85%",
     backgroundColor: Colors.white,
     borderRadius: Radius.lg,
     overflow: "hidden",
-
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  statusActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
+    elevation: 8,
   },
 
-  statusActionButton: {
-    flex: 1,
-    minWidth: "47%",
-    minHeight: 44,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.sm,
-  },
-
-  statusActionButtonActive: {
-    backgroundColor: Colors.teal600,
-    borderColor: Colors.teal600,
-  },
-
-  statusActionText: {
-    fontSize: FontSize.sm,
-    fontWeight: "700",
-  },
-  detailHeader: {
+  modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
+    justifyContent: "space-between",
+    padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
+    borderBottomColor: Colors.gray200,
   },
 
-  detailCategoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 5,
+  modalHeaderInfo: {
+    flex: 1,
+    paddingRight: Spacing.sm,
+  },
+  detailRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray200,
   },
 
-  detailDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  detailLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
+    marginBottom: 3,
   },
 
-  detailCategory: {
+  detailValue: {
+    fontSize: FontSize.sm,
+    color: Colors.gray900,
+    lineHeight: 20,
+  },
+  modalCategory: {
     fontSize: FontSize.xs,
     fontWeight: "700",
-    color: Colors.gray400,
+    color: Colors.teal600,
     textTransform: "uppercase",
-    letterSpacing: 0.7,
+    marginBottom: Spacing.xs,
   },
 
-  detailTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: "800",
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "700",
     color: Colors.gray900,
-    marginTop: 2,
+    marginBottom: Spacing.xs,
   },
 
-  detailId: {
+  modalProtocol: {
     fontSize: FontSize.xs,
     color: Colors.gray400,
-    marginTop: 4,
   },
 
-  closeBtn: {
+  modalCloseButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.bg,
   },
 
-  closeBtnText: {
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: "300",
-    color: Colors.gray600,
-  },
-
-  detailScroll: {
-    flexGrow: 0,
-  },
-
-  detailContent: {
+  modalContent: {
     padding: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
 
-  detailStatusRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  modalStatus: {
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.lg,
+  },
+
+  downloadModalBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EAF6F3",
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
     alignItems: "center",
-    paddingBottom: Spacing.md,
-    marginBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+
+  modalStatusText: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
   },
 
   detailSection: {
@@ -994,82 +885,116 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
 
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
-    gap: Spacing.md,
-  },
-
-  detailLabel: {
-    flex: 0.9,
+  detailDescription: {
     fontSize: FontSize.sm,
-    color: Colors.gray400,
-  },
-
-  detailValue: {
-    flex: 1.4,
-    fontSize: FontSize.sm,
-    fontWeight: "600",
-    color: Colors.gray900,
-    textAlign: "right",
-  },
-
-  descriptionBox: {
-    backgroundColor: Colors.gray50,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.06)",
-  },
-
-  descriptionText: {
-    fontSize: FontSize.sm,
-    lineHeight: 21,
     color: Colors.gray600,
+    lineHeight: 22,
   },
 
-  detailFooter: {
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray50,
-  },
-
-  detailCloseButton: {
-    backgroundColor: Colors.teal600,
+  modalFooterButton: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderRadius: Radius.md,
-    paddingVertical: 13,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.teal600,
   },
 
-  detailCloseButtonText: {
+  modalFooterButtonText: {
     color: Colors.white,
     fontSize: FontSize.sm,
     fontWeight: "700",
   },
-});
-
-const fabStyles = StyleSheet.create({
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 20,
-    backgroundColor: Colors.teal600,
-    borderRadius: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    gap: 8,
-    shadowColor: Colors.teal800,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+  scroll: { flex: 1 },
+  content: { padding: Spacing.lg },
+  greetingBlock: { marginBottom: Spacing.lg, gap: 2 },
+  greetingSub: { fontSize: FontSize.base, color: Colors.gray400 },
+  greetingName: {
+    fontSize: FontSize.xl,
+    fontWeight: "700",
+    color: Colors.gray900,
+    letterSpacing: -0.4,
   },
-  fabIcon: { fontSize: 18, color: "#fff", fontWeight: "300" },
-  fabLabel: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+
+  statItem: {
+    width: "48%",
+  },
+
+  loadingRow: {
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  primaryBtn: { marginBottom: Spacing.sm },
+  gridRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm },
+  gridItem: { flex: 1 },
+  sectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  feedCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(15,110,86,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  feedCenter: { paddingVertical: Spacing.xxl, alignItems: "center" },
+  feedEmpty: {
+    fontSize: FontSize.sm,
+    color: Colors.gray400,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  verTodasBtn: { alignItems: "center", paddingVertical: Spacing.md },
+  verTodasText: {
+    fontSize: FontSize.sm,
+    color: Colors.teal600,
+    fontWeight: "600",
+  },
+  profileBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  profileBtnInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+
+  profileBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.white,
+  },
 });
