@@ -682,27 +682,62 @@ export default function AgenteHomeScreen() {
         ) : (
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <StatsCard value={stats.total} label="Total notif." />
+              <StatsCard
+                value={stats.total}
+                label="Total notif."
+                accentColor="#374151"
+                backgroundColor="#FFFFFF"
+                borderColor="#E5E7EB"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.pendentes} label="Pendentes" />
+              <StatsCard
+                value={stats.pendentes}
+                label="Pendentes"
+                accentColor="#B91C1C"
+                backgroundColor="#fad4d4"
+                borderColor="#fba1a1"
+              />
+            </View>
+            <View style={styles.statItem}>
+              <StatsCard
+                value={stats.investigacao}
+                label="Em investigação"
+                accentColor="#C2410C"
+                backgroundColor="#f3d5b0"
+                borderColor="#ffcd93"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.investigacao} label="Em investigação" />
+              <StatsCard
+                value={stats.veridicos}
+                label="Verídicas"
+                accentColor="#15803D"
+                backgroundColor="#cafad8"
+                borderColor="#88f9af"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.veridicos} label="Verídicas" />
+              <StatsCard
+                value={stats.naoVeridicos}
+                label="Não verídicas"
+                accentColor="#6002b9"
+                backgroundColor="#e4b1ff"
+                borderColor="#e07aff"
+              />
+              
             </View>
-
             <View style={styles.statItem}>
-              <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
-            </View>
-
-            <View style={styles.statItem}>
-              <StatsCard value={stats.encerradas} label="Encerradas" />
+              <StatsCard
+                value={stats.encerradas}
+                label="Encerradas"
+                accentColor="#082367"
+                backgroundColor="#e1dfe9"
+                borderColor="#aaa3ff"
+              />
             </View>
           </View>
         )}

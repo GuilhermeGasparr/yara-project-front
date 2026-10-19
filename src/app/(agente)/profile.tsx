@@ -82,6 +82,7 @@ export default function ProfileScreen() {
           <InfoRow label="Nome completo" value={agente?.nome ?? "—"} />
           <InfoRow label="Cargo" value={agente?.cargo ?? "—"} />
           <InfoRow label="CPF" value={agente?.cpf ?? "—"} />
+           <InfoRow label="Microárea" value={String(agente?.microarea ?? "—")} />
         </View>
 
 

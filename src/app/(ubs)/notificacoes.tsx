@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   TouchableOpacity,
   Platform,
+  ScrollView,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -20,23 +21,38 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import {
   listarNotificacoesUBS,
   NotificacaoUBS,
+  NotificacaoStatus,
   baixarRelatorioPDFUBS,
+  setEmInvestigacao,
+  setVeridico,
+  setNaoVeridico,
+  setEncerrado,
 } from "@/services/UbsService";
-
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
 
 export default function NotificacoesUBSScreen() {
   const { width } = useWindowDimensions();
-
+  const [agenteFiltro, setAgenteFiltro] = useState<number | null>(null);
+  const [dropdownAgentesVisivel, setDropdownAgentesVisivel] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
   const [filtro, setFiltro] = useState("Todos");
+  const [mesFiltro, setMesFiltro] = useState("Todos os meses");
+  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
   const [selectedNotification, setSelectedNotification] =
     useState<NotificacaoUBS | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-
+  const [mostrarOpcoesAgentes, setMostrarOpcoesAgentes] = useState(false);
   const isSmallScreen = width < 380;
+  const handleStatusUpdated = useCallback(async (id: number) => {
+    const dados = await listarNotificacoesUBS();
 
+    setNotificacoes(dados);
+
+    const atualizada = dados.find((notificacao) => notificacao.id === id);
+
+    setSelectedNotification(atualizada ?? null);
+  }, []);
   const carregarNotificacoes = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,17 +77,93 @@ export default function NotificacoesUBSScreen() {
     carregarNotificacoes();
   }, [carregarNotificacoes]);
 
+  const mesesDisponiveis = useMemo(() => {
+    const meses = new Map<string, string>();
+
+    notificacoes.forEach((item) => {
+      if (!item.data_ocorrencia) return;
+
+      const data = new Date(item.data_ocorrencia);
+      if (Number.isNaN(data.getTime())) return;
+
+      const chave = `${data.getFullYear()}-${String(
+        data.getMonth() + 1,
+      ).padStart(2, "0")}`;
+
+      const nomeMes = data.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      });
+
+      meses.set(chave, nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1));
+    });
+
+    return Array.from(meses, ([valor, nome]) => ({ valor, nome })).sort(
+      (a, b) => b.valor.localeCompare(a.valor),
+    );
+  }, [notificacoes]);
+
+  const agentes = useMemo(() => {
+    const mapa = new Map<number, string>();
+
+    notificacoes.forEach((item) => {
+      if (item.acs_ace_id != null) {
+        mapa.set(
+          item.acs_ace_id,
+          item.acs_ace_nome?.trim() || `Agente #${item.acs_ace_id}`,
+        );
+      }
+    });
+
+    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+  }, [notificacoes]);
+
+  const normalizar = (valor?: string | null) =>
+    (valor ?? "")
+      .trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
   const notificacoesFiltradas = useMemo(() => {
-    if (filtro === "Todos") {
-      return notificacoes;
-    }
+    let resultado = notificacoes;
 
+    // Filtro por categoria ou status
     if (filtro === "EM INVESTIGAÇÃO") {
-      return notificacoes.filter((item) => item.status === "EM INVESTIGAÇÃO");
+      resultado = resultado.filter(
+        (item) => normalizar(item.status) === normalizar(filtro),
+      );
+    } else if (filtro !== "Todos") {
+      resultado = resultado.filter(
+        (item) => normalizar(item.categoria) === normalizar(filtro),
+      );
     }
 
-    return notificacoes.filter((item) => item.categoria === filtro);
-  }, [notificacoes, filtro]);
+    // Filtro por agente
+    if (agenteFiltro !== null) {
+      resultado = resultado.filter(
+        (item) => Number(item.acs_ace_id) === agenteFiltro,
+      );
+    }
+    if (mesFiltro !== "Todos os meses") {
+      resultado = resultado.filter((item) => {
+        if (!item.data_ocorrencia) return false;
+
+        const data = new Date(item.data_ocorrencia);
+
+        if (Number.isNaN(data.getTime())) return false;
+
+        const chave = `${data.getFullYear()}-${String(
+          data.getMonth() + 1,
+        ).padStart(2, "0")}`;
+
+        return chave === mesFiltro;
+      });
+    }
+    return resultado;
+  }, [notificacoes, filtro, agenteFiltro, mesFiltro]);
 
   const renderNotificacao = ({ item }: { item: NotificacaoUBS }) => {
     const categoriaStyle = getCategoriaStyle(item.categoria);
@@ -87,7 +179,6 @@ export default function NotificacoesUBSScreen() {
           <Text style={styles.cardTitle} numberOfLines={2}>
             {item.nome}
           </Text>
-
           <View
             style={[
               styles.statusBadge,
@@ -207,6 +298,133 @@ export default function NotificacoesUBSScreen() {
             );
           }}
         />
+
+        <View style={styles.agentFilterContainer}>
+          <Pressable
+            style={[
+              styles.agentFilterButton,
+              agenteFiltro !== null && styles.agentFilterButtonSelected,
+            ]}
+            onPress={() => setMostrarOpcoesAgentes((anterior) => !anterior)}
+          >
+            <Feather
+              name="filter"
+              size={16}
+              color={agenteFiltro !== null ? Colors.white : Colors.teal800}
+            />
+
+            <Text
+              style={[
+                styles.agentFilterButtonText,
+                agenteFiltro !== null && styles.agentFilterButtonTextSelected,
+              ]}
+              numberOfLines={1}
+            >
+              {agenteFiltro === null
+                ? "Agentes"
+                : (agentes.find((agente) => agente.id === agenteFiltro)?.nome ??
+                  "Agentes")}
+            </Text>
+
+            <Feather
+              name={mostrarOpcoesAgentes ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={agenteFiltro !== null ? Colors.white : Colors.teal800}
+            />
+          </Pressable>
+
+          {mostrarOpcoesAgentes && (
+            <View style={styles.agentDropdown}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+                {[
+                  { id: null as number | null, nome: "Todos os agentes" },
+                  ...agentes,
+                ].map((agente) => {
+                  const selecionado = agenteFiltro === agente.id;
+
+                  return (
+                    <Pressable
+                      key={agente.id === null ? "todos" : agente.id.toString()}
+                      style={[
+                        styles.agentOption,
+                        selecionado && styles.agentOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setAgenteFiltro(agente.id);
+                        setMostrarOpcoesAgentes(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.agentOptionText,
+                          selecionado && styles.agentOptionTextSelected,
+                        ]}
+                      >
+                        {agente.nome}
+                      </Text>
+
+                      {selecionado && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal800}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+        <View style={styles.monthFilterContainer}>
+          <Pressable
+            style={styles.agentFilterButton}
+            onPress={() => setMostrarOpcoesMes((visivel) => !visivel)}
+          >
+            <Feather name="calendar" size={16} color={Colors.gray400} />
+
+            <Text style={styles.agentDropdownText}>
+              {mesFiltro === "Todos os meses"
+                ? "Todos os meses"
+                : (mesesDisponiveis.find((mes) => mes.valor === mesFiltro)
+                    ?.nome ?? "Todos os meses")}
+            </Text>
+
+            <Feather
+              name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={Colors.gray400}
+            />
+          </Pressable>
+
+          {mostrarOpcoesMes && (
+            <View style={styles.agentDropdown}>
+              <Pressable
+                style={styles.agentOption}
+                onPress={() => {
+                  setMesFiltro("Todos os meses");
+                  setMostrarOpcoesMes(false);
+                }}
+              >
+                <Text>Todos os meses</Text>
+              </Pressable>
+
+              {mesesDisponiveis.map((mes) => (
+                <Pressable
+                  key={mes.valor}
+                  style={styles.agentOption}
+                  onPress={() => {
+                    setMesFiltro(mes.valor);
+                    setMostrarOpcoesMes(false);
+                  }}
+                >
+                  <Text>{mes.nome}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
 
       {/* CONTEÚDO */}
@@ -256,6 +474,7 @@ export default function NotificacoesUBSScreen() {
       <NotificacaoUBSDetailModal
         item={selectedNotification}
         onClose={() => setSelectedNotification(null)}
+        onStatusUpdated={handleStatusUpdated}
       />
     </SafeAreaView>
   );
@@ -293,17 +512,61 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function NotificacaoUBSDetailModal({
   item,
   onClose,
+  onStatusUpdated,
 }: {
   item: NotificacaoUBS | null;
   onClose: () => void;
+  onStatusUpdated: (id: number) => Promise<void>;
 }) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
-
+  const [alterandoStatus, setAlterandoStatus] = useState(false);
   if (!item) return null;
+
+  async function handleAlterarStatus(novoStatus: NotificacaoStatus) {
+    const notificacao = item;
+
+    if (!notificacao || alterandoStatus || notificacao.status === novoStatus) {
+      return;
+    }
+
+    try {
+      setAlterandoStatus(true);
+
+      switch (novoStatus) {
+        case "EM INVESTIGAÇÃO":
+          await setEmInvestigacao(notificacao.id);
+          break;
+
+        case "VERÍDICO":
+          await setVeridico(notificacao.id);
+          break;
+
+        case "NÃO VERÍDICO":
+          await setNaoVeridico(notificacao.id);
+          break;
+
+        case "ENCERRADO":
+          await setEncerrado(notificacao.id);
+          break;
+      }
+
+      await onStatusUpdated(notificacao.id);
+
+      Alert.alert("Sucesso", "Status da notificação atualizado.");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao alterar status",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível alterar o status da notificação.",
+      );
+    } finally {
+      setAlterandoStatus(false);
+    }
+  }
 
   const notificacaoId = item.id;
   const statusStyle = getStatusStyle(item.status);
-
   async function handleBaixarRelatorio() {
     if (baixandoRelatorio) return;
 
@@ -406,6 +669,81 @@ function NotificacaoUBSDetailModal({
                 >
                   {formatarStatus(item.status)}
                 </Text>
+              </View>
+              {/* AÇÕES DE STATUS */}
+              <Text style={styles.detailSectionLabel}>Alterar status</Text>
+
+              <View style={styles.acoesGrid}>
+                {(
+                  [
+                    {
+                      label: "✓ Verídico",
+                      status: "VERÍDICO",
+                      bg: Colors.teal50,
+                      border: Colors.teal100,
+                      color: Colors.teal800,
+                    },
+                    {
+                      label: "⟳ Em investigação",
+                      status: "EM INVESTIGAÇÃO",
+                      bg: "#FAEEDA",
+                      border: "#FAC775",
+                      color: "#854F0B",
+                    },
+                    {
+                      label: "✗ Não verídico",
+                      status: "NÃO VERÍDICO",
+                      bg: "#FDE8E8",
+                      border: "#F7C1C1",
+                      color: "#C62828",
+                    },
+                    {
+                      label: "■ Encerrado",
+                      status: "ENCERRADO",
+                      bg: "#F0EEE9",
+                      border: "#D9D5CC",
+                      color: Colors.gray600,
+                    },
+                  ] as const
+                ).map((acao) => {
+                  const isActive = item.status === acao.status;
+
+                  return (
+                    <TouchableOpacity
+                      key={acao.status}
+                      style={[
+                        styles.acaoBtn,
+                        {
+                          backgroundColor: acao.bg,
+                          borderColor: acao.border,
+                        },
+                        isActive && styles.acaoBtnActive,
+                      ]}
+                      onPress={() =>
+                        handleAlterarStatus(acao.status as NotificacaoStatus)
+                      }
+                      disabled={alterandoStatus || isActive}
+                      activeOpacity={0.8}
+                    >
+                      {alterandoStatus && !isActive ? (
+                        <ActivityIndicator size="small" color={acao.color} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.acaoBtnText,
+                            {
+                              color: isActive ? Colors.white : acao.color,
+                            },
+                          ]}
+                        >
+                          {isActive
+                            ? `✓ ${formatarStatus(acao.status)} (atual)`
+                            : acao.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* INFORMAÇÕES */}
@@ -687,6 +1025,44 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
 
+  detailSectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+
+  acoesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+
+  acaoBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    width: "48%",
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  acaoBtnActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  acaoBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
   filterContent: {
     paddingHorizontal: Spacing.md,
     gap: 10,
@@ -701,6 +1077,111 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  agentFilterContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    position: "relative",
+    zIndex: 10,
+  },
+
+  agentFilterButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    backgroundColor: Colors.white,
+  },
+
+  agentFilterButtonSelected: {
+    backgroundColor: Colors.teal800,
+    borderColor: Colors.teal800,
+  },
+
+  agentFilterButtonText: {
+    color: Colors.teal800,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
+
+  agentFilterButtonTextSelected: {
+    color: Colors.white,
+  },
+
+  agentDropdown: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    width: 260,
+    maxWidth: "100%",
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+
+  agentOption: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5EEEB",
+  },
+  monthFilterContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.sm,
+    position: "relative",
+    zIndex: 9,
+  },
+
+  monthFilterButtonSelected: {
+    backgroundColor: Colors.teal800,
+    borderColor: Colors.teal800,
+  },
+
+  monthFilterButtonText: {
+    color: Colors.teal800,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
+
+  monthFilterButtonTextSelected: {
+    color: Colors.white,
+  },
+  agentOptionSelected: {
+    backgroundColor: "#E8F5F1",
+  },
+
+  agentOptionText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+    marginRight: 8,
+  },
+
+  agentOptionTextSelected: {
+    color: Colors.teal800,
+    fontWeight: "700",
   },
 
   filterButtonSelected: {
@@ -721,6 +1202,66 @@ const styles = StyleSheet.create({
 
   filterTextSmall: {
     fontSize: 12,
+  },
+
+  agentFilterTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray600,
+    marginBottom: Spacing.sm,
+  },
+
+  agentDropdownText: {
+    flex: 1,
+    fontSize: FontSize.md,
+    color: Colors.gray800,
+    marginRight: Spacing.sm,
+  },
+
+  agentModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+
+  agentDropdownList: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    maxHeight: "65%",
+    overflow: "hidden",
+  },
+
+  agentDropdownHeader: {
+    fontSize: FontSize.md,
+    fontWeight: "600",
+    color: Colors.gray800,
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray200,
+  },
+
+  agentDropdownOption: {
+    minHeight: 48,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray100,
+  },
+
+  agentDropdownOptionText: {
+    flex: 1,
+    fontSize: FontSize.md,
+    color: Colors.gray800,
+    marginRight: Spacing.sm,
+  },
+
+  agentDropdownOptionSelected: {
+    fontWeight: "600",
+    color: Colors.gray600,
   },
 
   listContent: {
@@ -901,6 +1442,44 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.gray600,
     lineHeight: 19,
+  },
+
+  statusActions: {
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+
+  statusActionButton: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  statusActionButtonSelected: {
+    backgroundColor: "#EAF6F3",
+    borderColor: Colors.teal600,
+  },
+
+  statusActionText: {
+    color: Colors.teal800,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  statusActionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
+
+  statusActionDisabled: {
+    opacity: 0.6,
   },
 
   description: {

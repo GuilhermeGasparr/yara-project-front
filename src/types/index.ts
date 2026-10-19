@@ -7,6 +7,7 @@ export interface AgenteUser {
   cpf: string;
   cargo: string;
   ubs_atuante: number;
+  microarea?: string | number| null;
 }
 
 export interface UBSUser {
@@ -58,6 +59,7 @@ export interface LoginUsuario {
   ubs_atuante?: number;
   municipio?: string;
   superintendencia?: number;
+  microarea?: string | number | null;
 }
 
 export interface LoginResponse {

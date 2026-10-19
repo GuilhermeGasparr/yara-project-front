@@ -540,37 +540,66 @@ export default function CMScreen() {
         ) : (
           <View style={s.statsRow}>
             <View style={s.statItem}>
-              <StatsCard value={statsCards.total} label="Total notif." />
+              <StatsCard
+                value={statsCards.total}
+                label="Total notif."
+                accentColor="#374151"
+                backgroundColor="#FFFFFF"
+                borderColor="#E5E7EB"
+              />
             </View>
 
             <View style={s.statItem}>
-              <StatsCard value={statsCards.pendentes} label="Pendentes" />
+              <StatsCard
+                value={statsCards.pendentes}
+                label="Pendentes"
+                accentColor="#B91C1C"
+                backgroundColor="#fad4d4"
+                borderColor="#fba1a1"
+              />
             </View>
 
             <View style={s.statItem}>
               <StatsCard
                 value={statsCards.investigacao}
                 label="Em investigação"
+                accentColor="#C2410C"
+                backgroundColor="#f3d5b0"
+                borderColor="#ffcd93"
               />
             </View>
 
             <View style={s.statItem}>
-              <StatsCard value={statsCards.veridicos} label="Verídicas" />
+              <StatsCard
+                value={statsCards.veridicos}
+                label="Verídicas"
+                accentColor="#15803D"
+                backgroundColor="#cafad8"
+                borderColor="#88f9af"
+              />
             </View>
 
             <View style={s.statItem}>
               <StatsCard
                 value={statsCards.naoVeridicos}
                 label="Não verídicas"
+                accentColor="#6002b9"
+                backgroundColor="#e4b1ff"
+                borderColor="#e07aff"
               />
             </View>
 
             <View style={s.statItem}>
-              <StatsCard value={statsCards.encerradas} label="Encerradas" />
+              <StatsCard
+                value={statsCards.encerradas}
+                label="Encerradas"
+                accentColor="#082367"
+                backgroundColor="#e1dfe9"
+                borderColor="#aaa3ff"
+              />
             </View>
           </View>
         )}
-
         {/* Botão de Criar Conta UBS */}
         <TouchableOpacity
           style={s.primaryBtn}
@@ -581,12 +610,13 @@ export default function CMScreen() {
             <Feather name="home" size={18} color={Colors.white} />
             <View style={{ flex: 1 }}>
               <Text style={s.primaryBtnLabel}>Criar Conta UBS</Text>
-              <Text style={s.primaryBtnSub}>Cadastrar nova unidade de saúde</Text>
+              <Text style={s.primaryBtnSub}>
+                Cadastrar nova unidade de saúde
+              </Text>
             </View>
             <Feather name="chevron-right" size={20} color={Colors.white} />
           </View>
         </TouchableOpacity>
-
         {/* Filtros */}
         <ScrollView
           horizontal
@@ -611,7 +641,6 @@ export default function CMScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
         {/* Lista */}
         <Text style={s.sectionLabel}>
           Notificações — todo o município
@@ -619,7 +648,6 @@ export default function CMScreen() {
             ? ` · ${STATUS_CFG[filtro]?.label ?? filtro}`
             : ""}
         </Text>
-
         {loading ? (
           <View style={s.loadingWrap}>
             <ActivityIndicator color={Colors.teal400} size="large" />
@@ -639,7 +667,6 @@ export default function CMScreen() {
             />
           ))
         )}
-
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
@@ -733,13 +760,15 @@ const s = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "center",
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
+
   statItem: {
-    width: "48%",
+    width: "31%",
   },
+
   loadingRow: {
     height: 70,
     alignItems: "center",

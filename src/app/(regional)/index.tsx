@@ -72,10 +72,30 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function StatsCard({ value, label }: { value: number; label: string }) {
+function StatsCard({
+  value,
+  label,
+  accentColor,
+  backgroundColor,
+  borderColor,
+}: {
+  value: number;
+  label: string;
+  accentColor: string;
+  backgroundColor: string;
+  borderColor: string;
+}) {
   return (
-    <View style={styles.statCard}>
-      <Text style={styles.statNumber}>{value}</Text>
+    <View
+      style={[
+        styles.statCard,
+        {
+          backgroundColor,
+          borderColor,
+        },
+      ]}
+    >
+      <Text style={[styles.statNumber, { color: accentColor }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -466,7 +486,7 @@ export default function RegionalHomeScreen() {
             <Text style={styles.errorAction}>Toque para tentar novamente</Text>
           </TouchableOpacity>
         )}
-        {/* ─── Estatísticas ──────────────────────────────────────────────── */}
+        {/* ─── Estatísticas ───────────────────────────────────────────── */}
         {/* ─── Estatísticas ───────────────────────────────────────────── */}
         {loading ? (
           <View style={styles.loadingStats}>
@@ -475,25 +495,63 @@ export default function RegionalHomeScreen() {
         ) : (
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <StatsCard value={contagem.total} label="Total notif." />
+              <StatsCard
+                value={contagem.total}
+                label="Total notif."
+                accentColor="#374151"
+                backgroundColor="#FFFFFF"
+                borderColor="#E5E7EB"
+              />
             </View>
+
             <View style={styles.statItem}>
-              <StatsCard value={contagem.pendentes} label="Pendentes" />
+              <StatsCard
+                value={contagem.pendentes}
+                label="Pendentes"
+                accentColor="#B91C1C"
+                backgroundColor="#fad4d4"
+                borderColor="#fba1a1"
+              />
             </View>
+
             <View style={styles.statItem}>
               <StatsCard
                 value={contagem.emInvestigacao}
                 label="Em investigação"
+                accentColor="#C2410C"
+                backgroundColor="#f3d5b0"
+                borderColor="#ffcd93"
               />
             </View>
+
             <View style={styles.statItem}>
-              <StatsCard value={contagem.veridicos} label="Verídicas" />
+              <StatsCard
+                value={contagem.veridicos}
+                label="Verídicas"
+                accentColor="#15803D"
+                backgroundColor="#cafad8"
+                borderColor="#88f9af"
+              />
             </View>
+
             <View style={styles.statItem}>
-              <StatsCard value={contagem.naoVeridicos} label="Não verídicas" />
+              <StatsCard
+                value={contagem.naoVeridicos}
+                label="Não verídicas"
+                accentColor="#6002b9"
+                backgroundColor="#e4b1ff"
+                borderColor="#e07aff"
+              />
             </View>
+
             <View style={styles.statItem}>
-              <StatsCard value={contagem.encerrados} label="Encerradas" />
+              <StatsCard
+                value={contagem.encerrados}
+                label="Encerradas"
+                accentColor="#082367"
+                backgroundColor="#e1dfe9"
+                borderColor="#aaa3ff"
+              />
             </View>
           </View>
         )}

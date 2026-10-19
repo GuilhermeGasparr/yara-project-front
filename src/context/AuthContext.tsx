@@ -74,15 +74,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let fullUser: AuthUser;
 
-      if (me.role === "agente") {
-        fullUser = {
-          ...me,
-          id: usuario.id,
-          nome: usuario.nome,
-          cpf: usuario.cpf,
-          cargo: usuario.cargo ?? "",
-        };
-      } else if (me.role === "ubs") {
+      
+if (me.role === "agente") {
+  fullUser = {
+    ...me,
+    id: usuario.id,
+    nome: usuario.nome,
+    cpf: usuario.cpf,
+    cargo: usuario.cargo ?? "",
+    ubs_atuante: usuario.ubs_atuante ?? 0,
+    microarea: usuario.microarea ?? null,
+  };
+} else if (me.role === "ubs") {
         fullUser = {
           ...me,
           id: usuario.id,

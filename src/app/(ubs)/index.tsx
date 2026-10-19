@@ -7,7 +7,6 @@ import { useFocusEffect } from "expo-router";
 import {
   listarNotificacoes,
   Notificacao,
-  NotificacaoStatus,
   baixarRelatorioNotificacaoPDF,
 } from "@/services/NotificationService";
 import { AgenteUser, UBSUser } from "@/types";
@@ -29,7 +28,16 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { listarNotificacoesUBS } from "@/services/UbsService";
+import {
+  listarNotificacoesUBS,
+  NotificacaoUBS,
+  baixarRelatorioPDFUBS,
+  setEmInvestigacao,
+  setVeridico,
+  setNaoVeridico,
+  setEncerrado,
+} from "@/services/UbsService";
+import { NotificacaoStatus } from "@/services/NotificationService";
 
 function getSaudacao() {
   const h = new Date().getHours();
@@ -298,31 +306,33 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function NotificacaoDetailModal({
   item,
   onClose,
+  onStatusUpdated,
 }: {
   item: Notificacao | null;
   onClose: () => void;
+  onStatusUpdated: (id: number) => Promise<void>;
 }) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+  const [alterandoStatus, setAlterandoStatus] = useState(false);
 
   if (!item) return null;
 
   const notificacaoId = item.id;
   const statusStyle = getStatusStyle(item.status);
-
   async function handleBaixarRelatorio() {
     if (baixandoRelatorio) return;
 
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+      const blob = await baixarRelatorioPDFUBS();
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `notificacao_${notificacaoId}.pdf`;
+        link.download = `relatorio_ubs_${notificacaoId}.pdf`;
 
         document.body.appendChild(link);
         link.click();
@@ -340,6 +350,48 @@ function NotificacaoDetailModal({
       );
     } finally {
       setBaixandoRelatorio(false);
+    }
+  }
+  async function handleAlterarStatus(novoStatus: NotificacaoStatus) {
+    const notificacao = item;
+
+    if (!notificacao || alterandoStatus || notificacao.status === novoStatus) {
+      return;
+    }
+
+    try {
+      setAlterandoStatus(true);
+
+      switch (novoStatus) {
+        case "EM INVESTIGAÇÃO":
+          await setEmInvestigacao(notificacao.id);
+          break;
+
+        case "VERÍDICO":
+          await setVeridico(notificacao.id);
+          break;
+
+        case "NÃO VERÍDICO":
+          await setNaoVeridico(notificacao.id);
+          break;
+
+        case "ENCERRADO":
+          await setEncerrado(notificacao.id);
+          break;
+      }
+
+      await onStatusUpdated(notificacao.id);
+
+      Alert.alert("Sucesso", "Status atualizado com sucesso.");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao alterar status",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível alterar o status.",
+      );
+    } finally {
+      setAlterandoStatus(false);
     }
   }
 
@@ -413,6 +465,80 @@ function NotificacaoDetailModal({
                 </Text>
               </View>
 
+              {/* AÇÕES DE STATUS */}
+              <Text style={styles.detailSectionLabel}>Alterar status</Text>
+              <View style={styles.acoesGrid}>
+                {(
+                  [
+                    {
+                      label: "✓ Verídico",
+                      status: "VERÍDICO",
+                      bg: Colors.teal50,
+                      border: Colors.teal100,
+                      color: Colors.teal800,
+                    },
+                    {
+                      label: "⟳ Em investigação",
+                      status: "EM INVESTIGAÇÃO",
+                      bg: "#FAEEDA",
+                      border: "#FAC775",
+                      color: "#854F0B",
+                    },
+                    {
+                      label: "✗ Não verídico",
+                      status: "NÃO VERÍDICO",
+                      bg: "#FDE8E8",
+                      border: "#F7C1C1",
+                      color: "#C62828",
+                    },
+                    {
+                      label: "■ Encerrado",
+                      status: "ENCERRADO",
+                      bg: "#F0EEE9",
+                      border: "#D9D5CC",
+                      color: Colors.gray600,
+                    },
+                  ] as const
+                ).map((acao) => {
+                  const isActive = item.status === acao.status;
+
+                  return (
+                    <TouchableOpacity
+                      key={acao.status}
+                      style={[
+                        styles.acaoBtn,
+                        {
+                          backgroundColor: acao.bg,
+                          borderColor: acao.border,
+                        },
+                        isActive && styles.acaoBtnActive,
+                      ]}
+                      onPress={() =>
+                        handleAlterarStatus(acao.status as NotificacaoStatus)
+                      }
+                      disabled={alterandoStatus || isActive}
+                      activeOpacity={0.8}
+                    >
+                      {alterandoStatus && !isActive ? (
+                        <ActivityIndicator size="small" color={acao.color} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.acaoBtnText,
+                            {
+                              color: isActive ? Colors.white : acao.color,
+                            },
+                          ]}
+                        >
+                          {isActive
+                            ? `✓ ${formatarStatus(acao.status)} (atual)`
+                            : acao.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
               {/* INFORMAÇÕES */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>
@@ -452,7 +578,6 @@ function NotificacaoDetailModal({
                   )}
                 />
               </View>
-
               {/* CONTINUIDADE */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>
@@ -463,7 +588,6 @@ function NotificacaoDetailModal({
                   {item.continuidade_situacao || "Não informado"}
                 </Text>
               </View>
-
               {/* DESCRIÇÃO */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Descrição</Text>
@@ -472,7 +596,6 @@ function NotificacaoDetailModal({
                   {item.descricao || "Não informado"}
                 </Text>
               </View>
-
               {/* ENDEREÇO */}
               {item.endereco && (
                 <View style={styles.detailSection}>
@@ -481,7 +604,6 @@ function NotificacaoDetailModal({
                   <Text style={styles.detailDescription}>{item.endereco}</Text>
                 </View>
               )}
-
               {/* LOCALIZAÇÃO */}
               {(item.latitude != null || item.longitude != null) && (
                 <View style={styles.detailSection}>
@@ -590,7 +712,16 @@ export default function UbsHomeScreen() {
       fetchData();
     }, [fetchData]),
   );
+  const handleStatusUpdated = useCallback(async (id: number) => {
+    const data = await listarNotificacoesUBS();
+    setNotificacoes(data);
 
+    const atualizada = data.find((n) => n.id === id);
+
+    if (atualizada) {
+      setNotificacaoSelecionada(atualizada);
+    }
+  }, []);
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal600} />
@@ -644,27 +775,63 @@ export default function UbsHomeScreen() {
         ) : (
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <StatsCard value={stats.total} label="Total notif." />
+              <StatsCard
+                value={stats.total}
+                label="Total notif."
+                accentColor="#374151"
+                backgroundColor="#FFFFFF"
+                borderColor="#E5E7EB"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.pendentes} label="Pendentes" />
+              <StatsCard
+                value={stats.pendentes}
+                label="Pendentes"
+                accentColor="#B91C1C"
+                backgroundColor="#fad4d4"
+                borderColor="#fba1a1"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.investigacao} label="Em investigação" />
+              <StatsCard
+                value={stats.investigacao}
+                label="Em investigação"
+                accentColor="#C2410C"
+                backgroundColor="#f3d5b0"
+                borderColor="#ffcd93"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.veridicos} label="Verídicas" />
+              <StatsCard
+                value={stats.veridicos}
+                label="Verídicas"
+                accentColor="#15803D"
+                backgroundColor="#cafad8"
+                borderColor="#88f9af"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.naoVeridicos} label="Não verídicas" />
+              <StatsCard
+                value={stats.naoVeridicos}
+                label="Não verídicas"
+                accentColor="#6002b9"
+                backgroundColor="#e4b1ff"
+                borderColor="#e07aff"
+              />
             </View>
 
             <View style={styles.statItem}>
-              <StatsCard value={stats.encerradas} label="Encerradas" />
+              <StatsCard
+                value={stats.encerradas}
+                label="Encerradas"
+                accentColor="#082367"
+                backgroundColor="#e1dfe9"
+                borderColor="#aaa3ff"
+              />
             </View>
           </View>
         )}
@@ -701,9 +868,10 @@ export default function UbsHomeScreen() {
             <View style={styles.feedCenter}>
               <Text style={styles.feedEmpty}>
                 Nenhuma notificação ainda.{"\n"}
-                Toque em{" "}
-                <Text style={{ fontWeight: "700" }}>Notificações</Text> para
-                acompanhar.
+                Toque em <Text style={{ fontWeight: "700" }}>
+                  Notificações
+                </Text>{" "}
+                para acompanhar.
               </Text>
             </View>
           ) : (
@@ -733,6 +901,7 @@ export default function UbsHomeScreen() {
       <NotificacaoDetailModal
         item={notificacaoSelecionada}
         onClose={() => setNotificacaoSelecionada(null)}
+        onStatusUpdated={handleStatusUpdated}
       />
     </View>
   );
@@ -823,6 +992,44 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
 
+  detailSectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+
+  acoesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+
+  acaoBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    width: "48%",
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  acaoBtnActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  acaoBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
   modalTitle: {
     fontSize: FontSize.lg,
     fontWeight: "700",
@@ -877,6 +1084,39 @@ const styles = StyleSheet.create({
   detailSection: {
     marginBottom: Spacing.lg,
   },
+  statusActionButton: {
+    minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    backgroundColor: Colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
+
+  statusActionButtonSelected: {
+    borderColor: Colors.teal600,
+    backgroundColor: "#EAF6F3",
+  },
+
+  statusActionButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  statusActionText: {
+    fontSize: FontSize.sm,
+    color: Colors.gray900,
+    fontWeight: "500",
+  },
+
+  statusActionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
 
   detailSectionTitle: {
     fontSize: FontSize.sm,
@@ -920,13 +1160,13 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "center",
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
 
   statItem: {
-    width: "48%",
+    width: "31%",
   },
 
   loadingRow: {

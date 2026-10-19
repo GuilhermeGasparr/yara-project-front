@@ -32,6 +32,7 @@ export interface NotificacaoUBS {
   tipo_evento: string;
   categoria: Categoria;
   data_envio: string;
+  data_ocorrencia: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
   continuidade_situacao: string;

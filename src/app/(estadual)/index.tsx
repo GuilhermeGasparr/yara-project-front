@@ -414,15 +414,65 @@ export default function EstadualHomeScreen() {
             </View>
           ) : (
             <View style={styles.statsGrid}>
-              <StatsCard value={dashboard.total} label="Total" />
-              <StatsCard value={dashboard.pendentes} label="Pendentes" />
-              <StatsCard
-                value={dashboard.emInvestigacao}
-                label="Em investigação"
-              />
-              <StatsCard value={dashboard.veridicos} label="Verídicas" />
-              <StatsCard value={dashboard.naoVeridicos} label="Não verídicas" />
-              <StatsCard value={dashboard.encerrados} label="Encerradas" />
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.total}
+                  label="Total notif."
+                  accentColor="#374151"
+                  backgroundColor="#FFFFFF"
+                  borderColor="#E5E7EB"
+                />
+              </View>
+
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.pendentes}
+                  label="Pendentes"
+                  accentColor="#B91C1C"
+                  backgroundColor="#fad4d4"
+                  borderColor="#fba1a1"
+                />
+              </View>
+
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.emInvestigacao}
+                  label="Em investigação"
+                  accentColor="#C2410C"
+                  backgroundColor="#f3d5b0"
+                  borderColor="#ffcd93"
+                />
+              </View>
+
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.veridicos}
+                  label="Verídicas"
+                  accentColor="#15803D"
+                  backgroundColor="#cafad8"
+                  borderColor="#88f9af"
+                />
+              </View>
+
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.naoVeridicos}
+                  label="Não verídicas"
+                  accentColor="#6002b9"
+                  backgroundColor="#e4b1ff"
+                  borderColor="#e07aff"
+                />
+              </View>
+
+              <View style={styles.statItem}>
+                <StatsCard
+                  value={dashboard.encerrados}
+                  label="Encerradas"
+                  accentColor="#082367"
+                  backgroundColor="#e1dfe9"
+                  borderColor="#aaa3ff"
+                />
+              </View>
             </View>
           )}
         </View>
@@ -831,7 +881,12 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "center",
     gap: Spacing.sm,
+  },
+
+  statItem: {
+    width: "31%",
   },
 
   loadingStats: {
