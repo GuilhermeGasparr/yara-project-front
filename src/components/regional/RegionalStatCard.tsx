@@ -5,19 +5,16 @@ import Feather from "@expo/vector-icons/Feather";
 interface RegionalStatCardProps {
   title: string;
   value: number;
-  icon: keyof typeof Feather.glyphMap;
 }
 
 export default function RegionalStatCard({
   title,
   value,
-  icon,
 }: RegionalStatCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.iconContainer}>
         <Feather
-          name={icon}
           size={20}
           color="#087F5B"
         />

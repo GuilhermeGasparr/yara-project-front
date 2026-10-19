@@ -40,15 +40,17 @@ export default function RegionalProfileScreen() {
   const [dadosSuperintendencia, setDadosSuperintendencia] =
     useState<DadosSuperintendencia | null>(null);
   const vr = user as VRUser;
-
+  const [carregandoSuperintendencia, setCarregandoSuperintendencia] =
+    useState(true);
   useEffect(() => {
     async function carregarSuperintendencia() {
       try {
         const dados = await obterDadosSuperintendencia();
-
         setDadosSuperintendencia(dados);
       } catch (error) {
         console.error("Erro ao carregar superintendência:", error);
+      } finally {
+        setCarregandoSuperintendencia(false);
       }
     }
 
@@ -132,7 +134,11 @@ export default function RegionalProfileScreen() {
 
           <InfoRow
             label="Superintendência"
-            value={dadosSuperintendencia?.nome ?? "Carregando..."}
+            value={
+              carregandoSuperintendencia
+                ? "Carregando..."
+                : (dadosSuperintendencia?.nome ?? "Não disponível")
+            }
           />
         </View>
 

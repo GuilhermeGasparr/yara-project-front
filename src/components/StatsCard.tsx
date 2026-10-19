@@ -5,12 +5,31 @@ interface Props {
   value: number | string;
   label: string;
   accentColor?: string;
+  backgroundColor?: string;
+  borderColor?: string;
 }
 
-export function StatsCard({ value, label, accentColor = Colors.teal600 }: Props) {
+export function StatsCard({
+  value,
+  label,
+  accentColor = Colors.teal600,
+  backgroundColor = Colors.white,
+  borderColor = 'rgba(15,110,86,0.1)',
+}: Props) {
   return (
-    <View style={styles.card}>
-      <Text style={[styles.value, { color: accentColor }]}>{value}</Text>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor,
+          borderColor,
+        },
+      ]}
+    >
+      <Text style={[styles.value, { color: accentColor }]}>
+        {value}
+      </Text>
+
       <Text style={styles.label}>{label}</Text>
     </View>
   );
@@ -19,16 +38,14 @@ export function StatsCard({ value, label, accentColor = Colors.teal600 }: Props)
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: Colors.white,
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.sm,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(15,110,86,0.1)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
   },

@@ -12,9 +12,11 @@ export default function NotificationsByMunicipio({
 }: NotificationsByMunicipioProps) {
   const municipios = data.slice(0, 5);
 
+  // A barra não fica cheia quando existem poucos casos.
+  // A escala mínima é 10 e aumenta se houver mais notificações.
   const maiorQuantidade = Math.max(
     ...municipios.map((item) => item.quantidade),
-    1
+    10,
   );
 
   return (
@@ -30,8 +32,10 @@ export default function NotificationsByMunicipio({
           </Text>
         ) : (
           municipios.map((item) => {
-            const larguraBarra =
-              (item.quantidade / maiorQuantidade) * 100;
+            const larguraBarra = Math.min(
+              (item.quantidade / maiorQuantidade) * 100,
+              100,
+            );
 
             return (
               <View
@@ -86,10 +90,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 18,
     paddingVertical: 16,
-
     borderWidth: 1,
     borderColor: "#D9E7E3",
-
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -97,7 +99,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.05,
     shadowRadius: 4,
-
     elevation: 2,
   },
 
@@ -142,4 +143,4 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     paddingVertical: 10,
   },
-}); 
+});

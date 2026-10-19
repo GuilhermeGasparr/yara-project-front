@@ -18,7 +18,10 @@ import { router } from "expo-router";
 
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
-import { listarNotificacoesRegionais } from "@/services/RegionalService";
+import {
+  listarNotificacoesRegionais,
+  obterDadosSuperintendencia,
+} from "@/services/RegionalService";
 import type { Notificacao } from "@/services/NotificationService";
 
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
@@ -35,7 +38,9 @@ export default function RegionalNotificationsScreen() {
 
   const [selectedNotification, setSelectedNotification] =
     useState<Notificacao | null>(null);
-
+  const [coadsDisponiveis, setCoadsDisponiveis] = useState<string[]>([]);
+  const [filtroCoads, setFiltroCoads] = useState("Todas as COADS");
+  const [mostrarOpcoesCoads, setMostrarOpcoesCoads] = useState(false);
   const isSmallScreen = width < 380;
   const normalizar = (valor?: string) =>
     valor
@@ -44,7 +49,23 @@ export default function RegionalNotificationsScreen() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
   // ─── Carregar notificações da Regional ─────────────────────────────────────
+  const carregarCoads = useCallback(async () => {
+    try {
+      const dados = await obterDadosSuperintendencia();
 
+      setCoadsDisponiveis(
+        [...new Set(dados.coads ?? [])].sort((a, b) =>
+          a.localeCompare(b, "pt-BR"),
+        ),
+      );
+    } catch (error) {
+      console.error("Erro ao carregar COADS:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarCoads();
+  }, [carregarCoads]);
   const carregarNotificacoes = useCallback(async () => {
     try {
       setErro(null);
@@ -73,6 +94,15 @@ export default function RegionalNotificationsScreen() {
   // ─── Filtros ──────────────────────────────────────────────────────────────
 
   const notificacoesFiltradas = notificacoes.filter((item) => {
+    // Filtro por COADS
+    if (
+      filtroCoads !== "Todas as COADS" &&
+      normalizar(item.coads) !== normalizar(filtroCoads)
+    ) {
+      return false;
+    }
+
+    // Filtro por categoria ou status
     if (filtro === "Todos") {
       return true;
     }
@@ -231,6 +261,82 @@ export default function RegionalNotificationsScreen() {
             );
           }}
         />
+        <View style={styles.coadsContainer}>
+          <Pressable
+            style={[
+              styles.coadsButton,
+              filtroCoads !== "Todas as COADS" && styles.coadsButtonSelected,
+            ]}
+            onPress={() => setMostrarOpcoesCoads((anterior) => !anterior)}
+          >
+            <Feather
+              name="filter"
+              size={16}
+              color={
+                filtroCoads !== "Todas as COADS" ? Colors.white : Colors.teal800
+              }
+            />
+
+            <Text
+              style={[
+                styles.coadsButtonText,
+                filtroCoads !== "Todas as COADS" &&
+                  styles.coadsButtonTextSelected,
+              ]}
+            >
+              {filtroCoads === "Todas as COADS" ? "COADS" : filtroCoads}
+            </Text>
+
+            <Feather
+              name={mostrarOpcoesCoads ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={
+                filtroCoads !== "Todas as COADS" ? Colors.white : Colors.teal800
+              }
+            />
+          </Pressable>
+
+          {mostrarOpcoesCoads && (
+            <View style={styles.coadsDropdown}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+                {["Todas as COADS", ...coadsDisponiveis].map((coads) => {
+                  const selecionada = filtroCoads === coads;
+
+                  return (
+                    <Pressable
+                      key={coads}
+                      style={[
+                        styles.coadsOption,
+                        selecionada && styles.coadsOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setFiltroCoads(coads);
+                        setMostrarOpcoesCoads(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.coadsOptionText,
+                          selecionada && styles.coadsOptionTextSelected,
+                        ]}
+                      >
+                        {coads}
+                      </Text>
+
+                      {selecionada && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal800}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* CONTEÚDO */}
@@ -255,7 +361,9 @@ export default function RegionalNotificationsScreen() {
       ) : (
         <FlatList
           data={notificacoesFiltradas}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) =>
+            item.id != null ? String(item.id) : `notificacao-${index}`
+          }
           renderItem={renderNotificacao}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
@@ -326,7 +434,9 @@ function NotificacaoDetailModal({
             </Text>
 
             <Text style={styles.modalProtocol}>
-              Notificação #{String(item.id).padStart(4, "0")}
+              {item.id != null
+                ? `#${String(item.id).padStart(4, "0")}`
+                : "Sem ID"}
             </Text>
           </View>
 
@@ -795,7 +905,85 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 12,
   },
+  coadsContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    position: "relative",
+    zIndex: 10,
+  },
 
+  coadsButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    backgroundColor: Colors.white,
+  },
+
+  coadsButtonSelected: {
+    backgroundColor: Colors.teal800,
+    borderColor: Colors.teal800,
+  },
+
+  coadsButtonText: {
+    color: Colors.teal800,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+  },
+
+  coadsButtonTextSelected: {
+    color: Colors.white,
+  },
+
+  coadsDropdown: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    width: 240,
+    maxWidth: "100%",
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+
+  coadsOption: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5EEEB",
+  },
+
+  coadsOptionSelected: {
+    backgroundColor: "#E8F5F1",
+  },
+
+  coadsOptionText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+  },
+
+  coadsOptionTextSelected: {
+    color: Colors.teal800,
+    fontWeight: "700",
+  },
   cardFooter: {
     flexDirection: "row",
     alignItems: "center",

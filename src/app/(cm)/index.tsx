@@ -29,6 +29,8 @@ import {
   StatusCM,
 } from "@/services/CmService";
 import { Feather } from "@expo/vector-icons";
+import { StatsCard } from "@/components/StatsCard";
+
 // ─── Configurações de status ──────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
@@ -407,24 +409,19 @@ export default function CMScreen() {
   );
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
-  // ─── Fetch ──────────────────────────────────────────────────────────────────
-
-  async function handleDownloadRelatorio() {
-    try {
-      const blob = await exportarRelatorioPDF();
-
-      Alert.alert("Relatório gerado", "O relatório foi gerado com sucesso.");
-
-      // Aqui entra o salvamento do arquivo no dispositivo.
-    } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error
-          ? err.message
-          : "Não foi possível gerar o relatório.",
-      );
-    }
-  }
+  const statsCards = useMemo(
+    () => ({
+      total: notificacoes.length,
+      pendentes: notificacoes.filter((n) => n.status === "EM ANDAMENTO").length,
+      investigacao: notificacoes.filter((n) => n.status === "EM INVESTIGAÇÃO")
+        .length,
+      veridicos: notificacoes.filter((n) => n.status === "VERÍDICO").length,
+      naoVeridicos: notificacoes.filter((n) => n.status === "NÃO VERÍDICO")
+        .length,
+      encerradas: notificacoes.filter((n) => n.status === "ENCERRADO").length,
+    }),
+    [notificacoes],
+  );
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
@@ -450,15 +447,10 @@ export default function CMScreen() {
     fetchData();
   }, [fetchData]);
 
-  // ─── Filtro ──────────────────────────────────────────────────────────────────
-
   const notifFiltradas = useMemo(() => {
     if (filtro === "TODOS") return notificacoes;
-
     return notificacoes.filter((n) => n.status === filtro);
   }, [notificacoes, filtro]);
-
-  // ─── Ação de status ──────────────────────────────────────────────────────────
 
   async function handleStatusChange(id: number, novoStatus: StatusCM) {
     setLoadingId(id);
@@ -477,16 +469,13 @@ export default function CMScreen() {
       if (!fn) return;
       await fn(id);
 
-      // Atualiza localmente — reflete na tela do ACS pois o status é o mesmo campo no banco
       setNotificacoes((prev) =>
         prev.map((n) => (n.id === id ? { ...n, status: novoStatus } : n)),
       );
-      // Atualiza modal aberto
       setSelectedNotif((prev) =>
         prev && prev.id === id ? { ...prev, status: novoStatus } : prev,
       );
 
-      // Recarrega stats
       buscarDashboardStats()
         .then(setStats)
         .catch(() => {});
@@ -500,13 +489,9 @@ export default function CMScreen() {
     }
   }
 
-  // ─── Logout ──────────────────────────────────────────────────────────────────
-
-  async function handleProfile() {
+  function handleProfile() {
     router.push("/(cm)/profile");
   }
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
 
   const municipio = (user as any)?.municipio ?? "Município";
   const nome = (user as any)?.nome ?? "Coordenador";
@@ -525,9 +510,6 @@ export default function CMScreen() {
           </Text>
         </View>
 
-        {/* Download do relatório */}
-
-        {/* Perfil */}
         <TouchableOpacity
           style={s.avatarBtn}
           onPress={handleProfile}
@@ -551,39 +533,90 @@ export default function CMScreen() {
         }
       >
         {/* Stats */}
-        <View style={s.statsRow}>
-          <View style={s.statCard}>
-            <Text style={s.statNum}>{stats.total}</Text>
-            <Text style={s.statLbl}>Total mês</Text>
+        {loading ? (
+          <View style={s.loadingRow}>
+            <ActivityIndicator color={Colors.teal400} />
           </View>
-          <View style={s.statCard}>
-            <Text style={[s.statNum, { color: "#BA7517" }]}>
-              {stats.em_investigacao}
-            </Text>
-            <Text style={s.statLbl}>Investigação</Text>
-          </View>
-          <View style={s.statCard}>
-            <Text style={[s.statNum, { color: Colors.teal600 }]}>
-              {stats.veridicos}
-            </Text>
-            <Text style={s.statLbl}>Verídicas</Text>
-          </View>
-        </View>
+        ) : (
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.total}
+                label="Total notif."
+                accentColor="#374151"
+                backgroundColor="#FFFFFF"
+                borderColor="#E5E7EB"
+              />
+            </View>
 
-        {/* Banner de alerta quando há notificações em investigação */}
-        {stats.em_investigacao > 0 && (
-          <View style={s.alertBanner}>
-            <Text style={s.alertIcon}>⚠</Text>
-            <Text style={s.alertText}>
-              <Text style={{ fontWeight: "700" }}>
-                {stats.em_investigacao} ocorrência
-                {stats.em_investigacao > 1 ? "s" : ""}
-              </Text>{" "}
-              em investigação no município.
-            </Text>
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.pendentes}
+                label="Pendentes"
+                accentColor="#B91C1C"
+                backgroundColor="#fad4d4"
+                borderColor="#fba1a1"
+              />
+            </View>
+
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.investigacao}
+                label="Em investigação"
+                accentColor="#C2410C"
+                backgroundColor="#f3d5b0"
+                borderColor="#ffcd93"
+              />
+            </View>
+
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.veridicos}
+                label="Verídicas"
+                accentColor="#15803D"
+                backgroundColor="#cafad8"
+                borderColor="#88f9af"
+              />
+            </View>
+
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.naoVeridicos}
+                label="Não verídicas"
+                accentColor="#6002b9"
+                backgroundColor="#e4b1ff"
+                borderColor="#e07aff"
+              />
+            </View>
+
+            <View style={s.statItem}>
+              <StatsCard
+                value={statsCards.encerradas}
+                label="Encerradas"
+                accentColor="#082367"
+                backgroundColor="#e1dfe9"
+                borderColor="#aaa3ff"
+              />
+            </View>
           </View>
         )}
-
+        {/* Botão de Criar Conta UBS */}
+        <TouchableOpacity
+          style={s.primaryBtn}
+          onPress={() => router.push("./createUbs" as any)}
+          activeOpacity={0.8}
+        >
+          <View style={s.primaryBtnInner}>
+            <Feather name="home" size={18} color={Colors.white} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.primaryBtnLabel}>Criar Conta UBS</Text>
+              <Text style={s.primaryBtnSub}>
+                Cadastrar nova unidade de saúde
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={Colors.white} />
+          </View>
+        </TouchableOpacity>
         {/* Filtros */}
         <ScrollView
           horizontal
@@ -608,7 +641,6 @@ export default function CMScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
         {/* Lista */}
         <Text style={s.sectionLabel}>
           Notificações — todo o município
@@ -616,7 +648,6 @@ export default function CMScreen() {
             ? ` · ${STATUS_CFG[filtro]?.label ?? filtro}`
             : ""}
         </Text>
-
         {loading ? (
           <View style={s.loadingWrap}>
             <ActivityIndicator color={Colors.teal400} size="large" />
@@ -636,7 +667,6 @@ export default function CMScreen() {
             />
           ))
         )}
-
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
@@ -697,48 +727,53 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: Spacing.lg },
 
-  // Stats
-  statsRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.white,
+  // Primary Action Button (Criar Conta UBS)
+  primaryBtn: {
+    backgroundColor: Colors.teal600,
     borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.1)",
+    marginBottom: Spacing.lg,
+    overflow: "hidden",
+    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 1,
   },
-  statNum: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.teal600,
-    letterSpacing: -0.5,
-  },
-  statLbl: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
-
-  // Alert banner
-  alertBanner: {
+  primaryBtnInner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-    backgroundColor: "#FAEEDA",
-    borderLeftWidth: 3,
-    borderLeftColor: "#BA7517",
-    borderRadius: Radius.sm,
     padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  primaryBtnLabel: {
+    fontSize: FontSize.base,
+    fontWeight: "700",
+    color: Colors.white,
+  },
+  primaryBtnSub: {
+    fontSize: FontSize.xs,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 1,
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
-  alertIcon: { fontSize: 16, color: "#BA7517" },
-  alertText: {
-    flex: 1,
-    fontSize: FontSize.sm,
-    color: "#854F0B",
-    lineHeight: 20,
+
+  statItem: {
+    width: "31%",
+  },
+
+  loadingRow: {
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
   },
 
   // Filtros
@@ -932,14 +967,6 @@ const s = StyleSheet.create({
     overflow: "hidden",
     marginBottom: Spacing.sm,
   },
-  downloadBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: Spacing.sm,
-  },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -961,7 +988,7 @@ const s = StyleSheet.create({
   descricaoCard: { padding: Spacing.md },
   descricaoText: {
     fontSize: FontSize.sm,
-    color: Colors.gray600 ?? Colors.gray600,
+    color: Colors.gray600,
     lineHeight: 22,
   },
 

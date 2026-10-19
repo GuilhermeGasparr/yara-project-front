@@ -1,6 +1,7 @@
 import { getItem } from "@/utils/storage";
 
-const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 
 
@@ -31,6 +32,7 @@ export interface NotificacaoUBS {
   tipo_evento: string;
   categoria: Categoria;
   data_envio: string;
+  data_ocorrencia: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
   continuidade_situacao: string;
@@ -61,6 +63,30 @@ export async function validarNotificacao(id: number): Promise<void> {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail ?? "Erro ao validar.");
+}
+
+
+export async function baixarRelatorioPDFUBS(): Promise<Blob> {
+  const headers = await authHeader();
+
+  const res = await fetch(`${BASE_URL}/ubs/exportar_relatorio/pdf`, {
+    headers,
+  });
+
+  if (!res.ok) {
+    let mensagem = "Erro ao baixar o relatório PDF.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {
+      // Mantém a mensagem padrão se a resposta não for JSON.
+    }
+
+    throw new Error(mensagem);
+  }
+
+  return res.blob();
 }
 
 // ─── PATCH /ubs/notificacoes/:id/encaminhar ───────────────────────────────────

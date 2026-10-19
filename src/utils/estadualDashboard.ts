@@ -49,27 +49,23 @@ export function gerarDashboardEstadual(
   let epizootias = 0;
   let desastres = 0;
 
-  const municipiosInvestigacao =
-    new Set<string>();
+  const municipiosInvestigacao = new Set<string>();
 
   notificacoes.forEach((notificacao) => {
-    const status = normalizar(
-      notificacao.status,
-    );
+    const status = normalizar(notificacao.status);
 
-    const categoria = normalizar(
-      notificacao.categoria,
-    );
+    const categoria = normalizar(notificacao.categoria);
 
-    const municipio =
-      notificacao.municipio?.trim();
+    const municipio = notificacao.municipio?.trim();
 
     if (municipio) {
       municipios.add(municipio);
     }
 
     switch (status) {
+      case "PENDENTE":
       case "EM ANDAMENTO":
+      case "RECEBIDO":
         pendentes++;
         break;
 
@@ -77,18 +73,18 @@ export function gerarDashboardEstadual(
         emInvestigacao++;
 
         if (municipio) {
-          municipiosInvestigacao.add(
-            municipio,
-          );
+          municipiosInvestigacao.add(municipio);
         }
 
         break;
 
       case "VERIDICO":
+      case "CONFIRMADO":
         veridicos++;
         break;
 
       case "NAO VERIDICO":
+      case "DESCARTADO":
         naoVeridicos++;
         break;
 
@@ -125,8 +121,7 @@ export function gerarDashboardEstadual(
 
     pendentes,
 
-    municipiosAtivos:
-      municipios.size,
+    municipiosAtivos: municipios.size,
 
     doencas,
 
@@ -134,7 +129,6 @@ export function gerarDashboardEstadual(
 
     desastres,
 
-    municipiosEmInvestigacao:
-      municipiosInvestigacao.size,
+    municipiosEmInvestigacao: municipiosInvestigacao.size,
   };
 }

@@ -6,18 +6,21 @@ import {
   SafeAreaView,
   StatusBar,
   StyleSheet,
+  Alert,
   Text,
   View,
   useWindowDimensions,
+  TouchableOpacity,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-
+import { Platform } from "react-native";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
   listarNotificacoes,
   Notificacao,
+  baixarRelatorioNotificacaoPDF,
 } from "@/services/NotificationService";
 
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
@@ -292,6 +295,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
+
 function NotificacaoDetailModal({
   item,
   onClose,
@@ -299,9 +303,52 @@ function NotificacaoDetailModal({
   item: Notificacao | null;
   onClose: () => void;
 }) {
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+
+  // Mantém a verificação de null antes de acessar os dados.
   if (!item) return null;
 
+  // A partir daqui, o ID é uma constante do tipo correto.
+  const notificacaoId = item.id;
   const statusStyle = getStatusStyle(item.status);
+
+  async function handleBaixarRelatorio() {
+    if (baixandoRelatorio) return;
+
+    try {
+      setBaixandoRelatorio(true);
+
+      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = `notificacao_${notificacaoId}.pdf`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+
+      // O compartilhamento em Android/iOS pode ser implementado aqui.
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível baixar o relatório.",
+      );
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  }
+
+  // Mantenha o restante do JSX como está.
 
   return (
     <View style={styles.modalOverlay}>
@@ -321,6 +368,19 @@ function NotificacaoDetailModal({
               Notificação #{String(item.id).padStart(4, "0")}
             </Text>
           </View>
+
+          <TouchableOpacity
+            onPress={handleBaixarRelatorio}
+            style={styles.downloadModalBtn}
+            disabled={baixandoRelatorio}
+            activeOpacity={0.7}
+          >
+            {baixandoRelatorio ? (
+              <ActivityIndicator size="small" color={Colors.teal600} />
+            ) : (
+              <Feather name="download" size={20} color={Colors.teal600} />
+            )}
+          </TouchableOpacity>
 
           <Pressable
             style={styles.modalCloseButton}
@@ -629,6 +689,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
 
+  downloadModalBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EAF6F3",
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  
   backButton: {
     width: 38,
     height: 38,

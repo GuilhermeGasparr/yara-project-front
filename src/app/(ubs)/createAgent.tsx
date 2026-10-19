@@ -22,8 +22,8 @@ import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://yara-project.onrender.com";
-
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 async function criarAgente(payload: {
   nome: string;
   cpf: string;
@@ -300,7 +300,7 @@ function SuccessOverlay({
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
           <Text style={{ fontWeight: "700" }}>{nome}</Text> já pode fazer login
-          no Sentinela Saúde.
+          no NorteAlerta.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}

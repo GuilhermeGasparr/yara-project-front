@@ -18,6 +18,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 // ─── Ícone SVG inline — círculo + ponteiro de relógio (logo sentinela) ───────
@@ -45,7 +46,19 @@ function RoleSelector({
   hasError,
 }: RoleSelectorProps) {
   const [containerWidth, setContainerWidth] = useState(0);
+  const { width } = useWindowDimensions();
+  const isCompact = width <= 690;
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  const roles = [
+    { value: "ACS/ACE", label: "ACS / ACE", icon: "users" },
+    { value: "UBS", label: "Equipe UBS", icon: "home" },
+    { value: "CM", label: "Coord. Municipal", icon: "briefcase" },
+    { value: "VR", label: "Vig. Regional", icon: "map" },
+    { value: "VE", label: "Vig. Estadual", icon: "globe" },
+  ] as const;
+
+  const selectedOption = roles.find((role) => role.value === selectedRole);
   // Referências de animação
   const sliderAnim = useRef(new Animated.Value(0)).current;
   const scaleACS = useRef(new Animated.Value(1)).current;
@@ -164,6 +177,75 @@ function RoleSelector({
     selectedRole === "CM" ||
     selectedRole === "VR" ||
     selectedRole === "VE";
+
+  if (isCompact) {
+    return (
+      <View style={styles.dropdownContainer}>
+        <Pressable
+          style={[
+            styles.dropdownTrigger,
+            hasError && styles.selectorContainerError,
+          ]}
+          onPress={() => setDropdownOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityLabel="Selecionar tipo de usuário"
+          accessibilityState={{ expanded: dropdownOpen }}
+        >
+          <Text
+            style={[
+              styles.dropdownText,
+              !selectedOption && styles.dropdownPlaceholder,
+            ]}
+          >
+            {selectedOption?.label ?? "Selecione um perfil"}
+          </Text>
+
+          <Feather
+            name={dropdownOpen ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={Colors.teal600}
+          />
+        </Pressable>
+
+        {dropdownOpen && (
+          <View style={styles.dropdownOptions}>
+            {roles.map((role) => {
+              const isSelected = selectedRole === role.value;
+
+              return (
+                <Pressable
+                  key={role.value}
+                  style={[
+                    styles.dropdownOption,
+                    isSelected && styles.dropdownOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onChangeRole(role.value);
+                    setDropdownOpen(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownOptionText,
+                      isSelected && styles.dropdownOptionTextSelected,
+                    ]}
+                  >
+                    {role.label}
+                  </Text>
+
+                  {isSelected && (
+                    <Feather name="check" size={18} color={Colors.teal600} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  }
   return (
     <View
       style={[
@@ -540,7 +622,7 @@ export default function LoginScreen() {
           {/* Cabeçalho */}
           <View style={styles.header}>
             <SentinelaLogo />
-            <Text style={styles.appTitle}>Sentinela Saúde</Text>
+            <Text style={styles.appTitle}>NoteAlerta</Text>
             <Text style={styles.appSub}>
               Sistema de Notificação Comunitária
             </Text>
@@ -647,7 +729,7 @@ export default function LoginScreen() {
 
           {/* Rodapé */}
           <Text style={styles.footer}>
-            Sentinela Saúde © {new Date().getFullYear()}
+            NoteAlerta © {new Date().getFullYear()}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -794,6 +876,75 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+
+  dropdownContainer: {
+    marginBottom: Spacing.lg,
+    position: "relative",
+    zIndex: 10,
+  },
+
+  dropdownTrigger: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.gray100,
+    borderWidth: 1.5,
+    borderColor: Colors.gray100,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+  },
+
+  dropdownText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray900,
+  },
+
+  dropdownPlaceholder: {
+    color: Colors.gray400,
+  },
+
+  dropdownOptions: {
+    marginTop: Spacing.xs,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    overflow: "hidden",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+
+  dropdownOption: {
+    minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.gray200,
+  },
+
+  dropdownOptionSelected: {
+    backgroundColor: "rgba(15,110,86,0.08)",
+  },
+
+  dropdownOptionText: {
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+  },
+
+  dropdownOptionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
+
   selectorOption: {
     flex: 1,
     height: "100%",

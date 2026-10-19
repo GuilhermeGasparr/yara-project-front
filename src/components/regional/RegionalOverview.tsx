@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-
-import RegionalStatCard from "./RegionalStatCard";
+import RegionalStatCard from "./RegionalStatCard"; // Ou o componente menor equivalente se preferir
 
 interface RegionalOverviewProps {
   total: number;
@@ -20,28 +19,22 @@ export default function RegionalOverview({
     <View style={styles.container}>
       <Text style={styles.title}>Visão geral da Regional</Text>
 
-      <View style={styles.row}>
-        <RegionalStatCard title="Notificações" value={total} icon="bell" />
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <RegionalStatCard title="Total notif." value={total} />
+        </View>
 
-        <RegionalStatCard
-          title="Em investigação"
-          value={emInvestigacao}
-          icon="search"
-        />
-      </View>
+        <View style={styles.statItem}>
+          <RegionalStatCard title="Em investigação" value={emInvestigacao} />
+        </View>
 
-      <View style={styles.row}>
-        <RegionalStatCard
-          title="Verídicas"
-          value={veridicos}
-          icon="check-circle"
-        />
+        <View style={styles.statItem}>
+          <RegionalStatCard title="Verídicas" value={veridicos} />
+        </View>
 
-        <RegionalStatCard
-          title="Municípios ativos"
-          value={municipiosAtivos}
-          icon="map-pin"
-        />
+        <View style={styles.statItem}>
+          <RegionalStatCard title="Municípios ativos" value={municipiosAtivos} />
+        </View>
       </View>
     </View>
   );
@@ -49,18 +42,28 @@ export default function RegionalOverview({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 20,
+    marginTop: 24,
+    marginBottom: 8,
   },
 
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#12372A",
+    color: "#50756B",
+    textTransform: "uppercase",
     marginBottom: 10,
+    letterSpacing: 0.6,
   },
 
-  row: {
+  statsRow: {
     flexDirection: "row",
-    marginHorizontal: -5,
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
+
+  statItem: {
+    width: "31%",
+    flexGrow: 1,
   },
 });
