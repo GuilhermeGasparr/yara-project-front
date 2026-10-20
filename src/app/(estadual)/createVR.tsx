@@ -21,7 +21,7 @@ import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
 
 async function criarVigilanteRegional(payload: {
   nome: string;

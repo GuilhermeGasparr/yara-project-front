@@ -21,8 +21,7 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
-
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
 
 async function criarUbs(payload: {
   nome: string;
