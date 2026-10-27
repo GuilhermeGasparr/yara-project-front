@@ -14,11 +14,33 @@ import { deleteItem, getItem, saveItem } from "@/utils/storage";
 const TOKEN_KEY = "sentinela_token";
 const USER_KEY = "sentinela_user";
 
+// Área (pasta em src/app) de cada perfil. Cada área tem URL própria (/agente, /ubs...).
+const AREA_BY_ROLE = {
+  agente: "agente",
+  ubs: "ubs",
+  cm: "cm",
+  vr: "regional",
+  ve: "estadual",
+} as const satisfies Record<AuthUser["role"], string>;
+
+export const PROTECTED_AREAS: readonly string[] = Object.values(AREA_BY_ROLE);
+
+export function getHomeArea(role: AuthUser["role"]) {
+  return AREA_BY_ROLE[role];
+}
+
+export function getHomeRoute(role: AuthUser["role"]) {
+  return `/${AREA_BY_ROLE[role]}` as const;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (payload: LoginPayload, superintendencia?: string) => Promise<void>;
+  signIn: (
+    payload: LoginPayload,
+    superintendencia?: string,
+  ) => Promise<AuthUser>;
   signOut: () => Promise<void>;
 }
 
@@ -127,6 +149,8 @@ if (me.role === "agente") {
 
       setToken(access_token);
       setUser(fullUser);
+
+      return fullUser;
     },
     [],
   );

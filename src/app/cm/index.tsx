@@ -535,7 +535,7 @@ export default function CMScreen() {
   }
 
   function handleProfile() {
-    router.push("/(cm)/profile");
+    router.push("/cm/profile");
   }
 
   const municipio = (user as any)?.municipio ?? "Município";
@@ -684,7 +684,7 @@ export default function CMScreen() {
         {/* Acesso ao mapa */}
         <TouchableOpacity
           style={s.primaryBtn}
-          onPress={() => router.push("/(cm)/map")}
+          onPress={() => router.push("/cm/map")}
           activeOpacity={0.8}
         >
           <View style={s.primaryBtnInner}>

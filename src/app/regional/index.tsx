@@ -448,7 +448,7 @@ export default function RegionalHomeScreen() {
         </View>
         <TouchableOpacity
           style={styles.profileButton}
-          onPress={() => router.push("/(regional)/profile")}
+          onPress={() => router.push("/regional/profile")}
         >
           <View style={styles.profileCircle}>
             <Text style={styles.profileInitials}>
@@ -558,7 +558,7 @@ export default function RegionalHomeScreen() {
     
         <TouchableOpacity
           style={styles.mapButton}
-          onPress={() => router.push("/(regional)/map")}
+          onPress={() => router.push("/regional/map")}
           activeOpacity={0.85}
         >
           <View style={styles.mapIconWrap}>
@@ -578,7 +578,7 @@ export default function RegionalHomeScreen() {
         {/* ─── Criar conta Coordenador Municipal ─────────────────────────── */}
         <TouchableOpacity
           style={styles.createCMButton}
-          onPress={() => router.navigate("./createCM")}
+          onPress={() => router.navigate("/regional/createCM")}
           activeOpacity={0.85}
         >
           <View style={styles.createCMIconWrap}>
@@ -626,7 +626,7 @@ export default function RegionalHomeScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.navigate("./notificacoes")}>
+            <TouchableOpacity onPress={() => router.navigate("/regional/notificacoes")}>
               <Text style={styles.seeAll}>Ver todas</Text>
             </TouchableOpacity>
           </View>

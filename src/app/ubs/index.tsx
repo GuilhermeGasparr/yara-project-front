@@ -7,10 +7,9 @@ import { useFocusEffect } from "expo-router";
 import {
   listarNotificacoes,
   Notificacao,
-  NotificacaoStatus,
   baixarRelatorioNotificacaoPDF,
 } from "@/services/NotificationService";
-import { AgenteUser } from "@/types";
+import { AgenteUser, UBSUser } from "@/types";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
@@ -29,6 +28,16 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import {
+  listarNotificacoesUBS,
+  NotificacaoUBS,
+  baixarRelatorioPDFUBS,
+  setEmInvestigacao,
+  setVeridico,
+  setNaoVeridico,
+  setEncerrado,
+} from "@/services/UbsService";
+import { NotificacaoStatus } from "@/services/NotificationService";
 
 function getSaudacao() {
   const h = new Date().getHours();
@@ -49,8 +58,22 @@ function getInitials(nome: string): string {
     .slice(0, 2)
     .join("");
 }
-// ─── Ícones ───────────────────────────────────────────────────────────────────
 
+// ─── Ícones ───────────────────────────────────────────────────────────────────
+function MapIcon() {
+  return (
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Feather name="map" size={18} color={Colors.teal600} />
+    </View>
+  );
+}
 function PlusIcon() {
   return (
     <View
@@ -79,6 +102,21 @@ function PlusIcon() {
           borderRadius: 1,
         }}
       />
+    </View>
+  );
+}
+
+function UserPlusIcon() {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Feather name="user-plus" size={18} color={Colors.white} />
     </View>
   );
 }
@@ -213,34 +251,6 @@ function formatarStatus(status: string) {
   }
 }
 
-function getCategoriaStyle(categoria: string) {
-  switch (categoria) {
-    case "DOENÇA":
-      return {
-        backgroundColor: "#FDE8E8",
-        color: "#C62828",
-      };
-
-    case "EPIZOOTIA":
-      return {
-        backgroundColor: "#FFF0D8",
-        color: "#A15C00",
-      };
-
-    case "DESASTRE":
-      return {
-        backgroundColor: "#E4F0FD",
-        color: "#1261A0",
-      };
-
-    default:
-      return {
-        backgroundColor: Colors.gray100,
-        color: Colors.gray600,
-      };
-  }
-}
-
 function getStatusStyle(status: string) {
   switch (status) {
     case "EM INVESTIGAÇÃO":
@@ -309,33 +319,33 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function NotificacaoDetailModal({
   item,
   onClose,
+  onStatusUpdated,
 }: {
   item: Notificacao | null;
   onClose: () => void;
+  onStatusUpdated: (id: number) => Promise<void>;
 }) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+  const [alterandoStatus, setAlterandoStatus] = useState(false);
 
-  // Mantém a verificação de null antes de acessar os dados.
   if (!item) return null;
 
-  // A partir daqui, o ID é uma constante do tipo correto.
   const notificacaoId = item.id;
   const statusStyle = getStatusStyle(item.status);
-
   async function handleBaixarRelatorio() {
     if (baixandoRelatorio) return;
 
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+      const blob = await baixarRelatorioPDFUBS();
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `notificacao_${notificacaoId}.pdf`;
+        link.download = `relatorio_ubs_${notificacaoId}.pdf`;
 
         document.body.appendChild(link);
         link.click();
@@ -344,8 +354,6 @@ function NotificacaoDetailModal({
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         return;
       }
-
-      // O compartilhamento em Android/iOS pode ser implementado aqui.
     } catch (error) {
       Alert.alert(
         "Erro ao exportar",
@@ -357,8 +365,48 @@ function NotificacaoDetailModal({
       setBaixandoRelatorio(false);
     }
   }
+  async function handleAlterarStatus(novoStatus: NotificacaoStatus) {
+    const notificacao = item;
 
-  // Mantenha o restante do JSX como está.
+    if (!notificacao || alterandoStatus || notificacao.status === novoStatus) {
+      return;
+    }
+
+    try {
+      setAlterandoStatus(true);
+
+      switch (novoStatus) {
+        case "EM INVESTIGAÇÃO":
+          await setEmInvestigacao(notificacao.id);
+          break;
+
+        case "VERÍDICO":
+          await setVeridico(notificacao.id);
+          break;
+
+        case "NÃO VERÍDICO":
+          await setNaoVeridico(notificacao.id);
+          break;
+
+        case "ENCERRADO":
+          await setEncerrado(notificacao.id);
+          break;
+      }
+
+      await onStatusUpdated(notificacao.id);
+
+      Alert.alert("Sucesso", "Status atualizado com sucesso.");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao alterar status",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível alterar o status.",
+      );
+    } finally {
+      setAlterandoStatus(false);
+    }
+  }
 
   return (
     <View style={styles.modalOverlay}>
@@ -430,6 +478,80 @@ function NotificacaoDetailModal({
                 </Text>
               </View>
 
+              {/* AÇÕES DE STATUS */}
+              <Text style={styles.detailSectionLabel}>Alterar status</Text>
+              <View style={styles.acoesGrid}>
+                {(
+                  [
+                    {
+                      label: "✓ Verídico",
+                      status: "VERÍDICO",
+                      bg: Colors.teal50,
+                      border: Colors.teal100,
+                      color: Colors.teal800,
+                    },
+                    {
+                      label: "⟳ Em investigação",
+                      status: "EM INVESTIGAÇÃO",
+                      bg: "#FAEEDA",
+                      border: "#FAC775",
+                      color: "#854F0B",
+                    },
+                    {
+                      label: "✗ Não verídico",
+                      status: "NÃO VERÍDICO",
+                      bg: "#FDE8E8",
+                      border: "#F7C1C1",
+                      color: "#C62828",
+                    },
+                    {
+                      label: "■ Encerrado",
+                      status: "ENCERRADO",
+                      bg: "#F0EEE9",
+                      border: "#D9D5CC",
+                      color: Colors.gray600,
+                    },
+                  ] as const
+                ).map((acao) => {
+                  const isActive = item.status === acao.status;
+
+                  return (
+                    <TouchableOpacity
+                      key={acao.status}
+                      style={[
+                        styles.acaoBtn,
+                        {
+                          backgroundColor: acao.bg,
+                          borderColor: acao.border,
+                        },
+                        isActive && styles.acaoBtnActive,
+                      ]}
+                      onPress={() =>
+                        handleAlterarStatus(acao.status as NotificacaoStatus)
+                      }
+                      disabled={alterandoStatus || isActive}
+                      activeOpacity={0.8}
+                    >
+                      {alterandoStatus && !isActive ? (
+                        <ActivityIndicator size="small" color={acao.color} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.acaoBtnText,
+                            {
+                              color: isActive ? Colors.white : acao.color,
+                            },
+                          ]}
+                        >
+                          {isActive
+                            ? `✓ ${formatarStatus(acao.status)} (atual)`
+                            : acao.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
               {/* INFORMAÇÕES */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>
@@ -469,7 +591,6 @@ function NotificacaoDetailModal({
                   )}
                 />
               </View>
-
               {/* CONTINUIDADE */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>
@@ -480,7 +601,6 @@ function NotificacaoDetailModal({
                   {item.continuidade_situacao || "Não informado"}
                 </Text>
               </View>
-
               {/* DESCRIÇÃO */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Descrição</Text>
@@ -489,7 +609,6 @@ function NotificacaoDetailModal({
                   {item.descricao || "Não informado"}
                 </Text>
               </View>
-
               {/* ENDEREÇO */}
               {item.endereco && (
                 <View style={styles.detailSection}>
@@ -498,7 +617,6 @@ function NotificacaoDetailModal({
                   <Text style={styles.detailDescription}>{item.endereco}</Text>
                 </View>
               )}
-
               {/* LOCALIZAÇÃO */}
               {(item.latitude != null || item.longitude != null) && (
                 <View style={styles.detailSection}>
@@ -535,41 +653,28 @@ function NotificacaoDetailModal({
   );
 }
 
-function QuestionIcon() {
+function BellIcon() {
   return (
     <View
       style={{
         width: 20,
         height: 20,
-        borderRadius: 10,
-        borderWidth: 1.8,
-        borderColor: Colors.teal600,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Text
-        style={{
-          fontSize: 11,
-          color: Colors.teal600,
-          fontWeight: "700",
-          lineHeight: 13,
-        }}
-      >
-        ?
-      </Text>
+      <Feather name="bell" size={18} color={Colors.teal600} />
     </View>
   );
 }
 
 // ─── Tela ─────────────────────────────────────────────────────────────────────
 
-export default function AgenteHomeScreen() {
+export default function UbsHomeScreen() {
   const { user } = useAuth();
-  const agente = user as AgenteUser;
+  const ubs = user as UBSUser;
   const [notificacaoSelecionada, setNotificacaoSelecionada] =
     useState<Notificacao | null>(null);
-  // useRouter em vez de router importado — mais estável dentro de grupos de tabs
   const router = useRouter();
 
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
@@ -602,8 +707,15 @@ export default function AgenteHomeScreen() {
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
       isRefresh ? setRefreshing(true) : setLoading(true);
-      const data = await listarNotificacoes();
-      setNotificacoes(data);
+      const data = await listarNotificacoesUBS();
+      setNotificacoes(
+        data.map((n) => ({
+          ...n,
+          endereco: n.endereco ?? undefined,
+          latitude: n.latitude ?? undefined,
+          longitude: n.longitude ?? undefined,
+        })),
+      );
     } catch (err) {
       Alert.alert(
         "Erro",
@@ -620,15 +732,28 @@ export default function AgenteHomeScreen() {
       fetchData();
     }, [fetchData]),
   );
+  const handleStatusUpdated = useCallback(async (id: number) => {
+    const data = await listarNotificacoesUBS();
+    setNotificacoes(
+      data.map((n) => ({
+        ...n,
+        endereco: n.endereco ?? undefined,
+        latitude: n.latitude ?? undefined,
+        longitude: n.longitude ?? undefined,
+      })),
+    );
 
-  // Dentro de um grupo de Tabs, navigate com o nome relativo da rota
-  // é mais confiável do que o caminho absoluto com o grupo entre parênteses
-  function goTo(route: "newNotification" | "history" | "map" | "guide") {
-    // @ts-ignore — Expo Router infere os tipos das rotas, mas dentro de grupos
-    // de tabs o caminho relativo é aceito em runtime mesmo sem inferência correta
-    router.navigate(route);
-  }
+    const atualizada = data.find((n) => n.id === id);
 
+    if (atualizada) {
+      setNotificacaoSelecionada({
+        ...atualizada,
+        endereco: atualizada.endereco ?? undefined,
+        latitude: atualizada.latitude ?? undefined,
+        longitude: atualizada.longitude ?? undefined,
+      });
+    }
+  }, []);
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal600} />
@@ -641,7 +766,7 @@ export default function AgenteHomeScreen() {
         </View>
         <TouchableOpacity
           style={styles.profileBtn}
-          onPress={() => router.push("/(agente)/profile")}
+          onPress={() => router.push("/ubs/profile")}
           activeOpacity={0.8}
           hitSlop={8}
         >
@@ -670,11 +795,11 @@ export default function AgenteHomeScreen() {
         <View style={styles.greetingBlock}>
           <Text style={styles.greetingSub}>{getSaudacao()}</Text>
           <Text style={styles.greetingName}>
-            {agente?.nome ?? "Agente"} · {agente?.cargo ?? "ACS"}
+            {ubs?.nome ?? "Agente"} · {ubs?.municipio ?? "UBS"}
           </Text>
         </View>
 
-        {/* Stats */}
+        {/* Stats em duas colunas */}
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color={Colors.teal400} />
@@ -700,6 +825,7 @@ export default function AgenteHomeScreen() {
                 borderColor="#fba1a1"
               />
             </View>
+
             <View style={styles.statItem}>
               <StatsCard
                 value={stats.investigacao}
@@ -728,8 +854,8 @@ export default function AgenteHomeScreen() {
                 backgroundColor="#e4b1ff"
                 borderColor="#e07aff"
               />
-              
             </View>
+
             <View style={styles.statItem}>
               <StatsCard
                 value={stats.encerradas}
@@ -744,41 +870,40 @@ export default function AgenteHomeScreen() {
 
         {/* Ações rápidas */}
         <QuickActionButton
-          label="Nova Notificação"
-          sublabel="Registrar ocorrência agora"
-          icon={<PlusIcon />}
-          onPress={() => goTo("newNotification")}
+          label="Criar Agente"
+          sublabel="Cadastrar novo ACS ou ACE"
+          icon={<UserPlusIcon />}
+          onPress={() => router.navigate("/ubs/createAgent")}
           primary
           style={styles.primaryBtn}
         />
 
         <View style={styles.gridRow}>
           <QuickActionButton
-            label="Histórico"
-            sublabel="Minhas notificações"
-            icon={<CalendarIcon />}
-            onPress={() => goTo("history")}
-            style={styles.gridItem}
-          />
-          <QuickActionButton
-            label="Mapa"
-            sublabel="Território"
-            icon={<MapFoldIcon />}
-            onPress={() => router.navigate("/(agente)/map")}
+            label="Notificações"
+            sublabel="Ver todas as ocorrências"
+            icon={<BellIcon />}
+            onPress={() => router.navigate("/ubs/notificacoes")}
             style={styles.gridItem}
           />
         </View>
-
         <View style={styles.gridRow}>
           <QuickActionButton
-            label="Guia"
-            sublabel="Informações rápidas"
-            icon={<QuestionIcon />}
-            onPress={() => goTo("guide")}
-            style={{ flex: 1 }}
+            label="Notificações"
+            sublabel="Ver todas as ocorrências"
+            icon={<BellIcon />}
+            onPress={() => router.navigate("/ubs/notificacoes")}
+            style={styles.gridItem}
+          />
+
+          <QuickActionButton
+            label="Mapa"
+            sublabel="Visualizar mapa de ocorrências"
+            icon={<MapIcon />}
+            onPress={() => router.navigate("/ubs/map")}
+            style={styles.gridItem}
           />
         </View>
-
         {/* Feed */}
         <Text style={styles.sectionLabel}>Atualizações recentes</Text>
 
@@ -791,9 +916,10 @@ export default function AgenteHomeScreen() {
             <View style={styles.feedCenter}>
               <Text style={styles.feedEmpty}>
                 Nenhuma notificação ainda.{"\n"}
-                Toque em{" "}
-                <Text style={{ fontWeight: "700" }}>Nova Notificação</Text> para
-                começar.
+                Toque em <Text style={{ fontWeight: "700" }}>
+                  Notificações
+                </Text>{" "}
+                para acompanhar.
               </Text>
             </View>
           ) : (
@@ -810,7 +936,7 @@ export default function AgenteHomeScreen() {
         {recentes.length > 0 && (
           <TouchableOpacity
             style={styles.verTodasBtn}
-            onPress={() => goTo("history")}
+            onPress={() => router.navigate("/ubs/notificacoes")}
             activeOpacity={0.7}
           >
             <Text style={styles.verTodasText}>Ver todas as notificações →</Text>
@@ -819,9 +945,11 @@ export default function AgenteHomeScreen() {
 
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
+
       <NotificacaoDetailModal
         item={notificacaoSelecionada}
         onClose={() => setNotificacaoSelecionada(null)}
+        onStatusUpdated={handleStatusUpdated}
       />
     </View>
   );
@@ -912,6 +1040,44 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
 
+  detailSectionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: "700",
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+
+  acoesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+
+  acaoBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    width: "48%",
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  acaoBtnActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  acaoBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
   modalTitle: {
     fontSize: FontSize.lg,
     fontWeight: "700",
@@ -966,6 +1132,39 @@ const styles = StyleSheet.create({
   detailSection: {
     marginBottom: Spacing.lg,
   },
+  statusActionButton: {
+    minHeight: 46,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    backgroundColor: Colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
+
+  statusActionButtonSelected: {
+    borderColor: Colors.teal600,
+    backgroundColor: "#EAF6F3",
+  },
+
+  statusActionButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  statusActionText: {
+    fontSize: FontSize.sm,
+    color: Colors.gray900,
+    fontWeight: "500",
+  },
+
+  statusActionTextSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
 
   detailSectionTitle: {
     fontSize: FontSize.sm,
@@ -996,31 +1195,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: "700",
   },
-  bellClapper: {
-    width: 5,
-    height: 4,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-    borderWidth: 2,
-    borderColor: Colors.white,
-    borderTopWidth: 0,
-    marginTop: 1,
-  },
-  bellBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: Colors.red400,
-    borderRadius: 9,
-    minWidth: 17,
-    height: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: Colors.teal600,
-  },
-  bellBadgeText: { fontSize: 9, color: Colors.white, fontWeight: "700" },
   scroll: { flex: 1 },
   content: { padding: Spacing.lg },
   greetingBlock: { marginBottom: Spacing.lg, gap: 2 },

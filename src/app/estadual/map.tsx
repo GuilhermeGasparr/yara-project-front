@@ -2,7 +2,7 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { listarNotificacoesVE } from "@/services/VeService";
 import type { Notificacao } from "@/services/NotificationService";
 
-import WebMap from "@/app/(agente)/WebMap";
+import WebMap from "@/app/agente/WebMap";
 
 import Feather from "@expo/vector-icons/Feather";
 import { router } from "expo-router";

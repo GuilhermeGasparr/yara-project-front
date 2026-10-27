@@ -372,7 +372,7 @@ export default function EstadualHomeScreen() {
 
         <TouchableOpacity
           style={styles.profileButton}
-          onPress={() => router.push("/(estadual)/perfil")}
+          onPress={() => router.push("/estadual/perfil")}
           activeOpacity={0.8}
           hitSlop={8}
         >
@@ -516,7 +516,7 @@ export default function EstadualHomeScreen() {
 
           <TouchableOpacity
             style={styles.mapShortcut}
-            onPress={() => router.push("/(estadual)/map")}
+            onPress={() => router.push("/estadual/map")}
             activeOpacity={0.85}
           >
             <View style={styles.mapShortcutIcon}>
@@ -544,7 +544,7 @@ export default function EstadualHomeScreen() {
 
           <TouchableOpacity
             style={styles.mapShortcut}
-            onPress={() => router.navigate("./createVR")}
+            onPress={() => router.navigate("/estadual/createVR")}
             activeOpacity={0.85}
           >
             <View style={styles.mapShortcutIcon}>
@@ -738,7 +738,7 @@ export default function EstadualHomeScreen() {
         {!loading && notificacoes.length > 0 ? (
           <TouchableOpacity
             style={styles.allNotificationsButton}
-            onPress={() => router.push("/(estadual)/notificacoes")}
+            onPress={() => router.push("/estadual/notificacoes")}
             activeOpacity={0.85}
           >
             <Feather name="list" size={18} color={Colors.teal600} />
