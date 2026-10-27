@@ -1,7 +1,7 @@
 import { getItem } from "@/utils/storage";
 
 const BASE_URL = "https://yara-project.onrender.com";
-
+//const BASE_URL = "http://localhost:8000";
 
 const BASE_HEADERS: Record<string, string> = {
   "ngrok-skip-browser-warning": "true",
@@ -33,6 +33,11 @@ export interface NotificacaoUBS {
   data_ocorrencia: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
+  endereco?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  municipio?: string;
+  estado?: string;
   continuidade_situacao: string;
   descricao: string;
   acs_ace_id: number;
@@ -62,7 +67,6 @@ export async function validarNotificacao(id: number): Promise<void> {
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail ?? "Erro ao validar.");
 }
-
 
 export async function baixarRelatorioPDFUBS(): Promise<Blob> {
   const headers = await authHeader();

@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
+  Pressable,
 } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
@@ -391,16 +392,36 @@ function NotifCard({ item, onPress }: NotifCardProps) {
 }
 
 // ─── Tela principal ───────────────────────────────────────────────────────────
+function getMesKey(data: string): string {
+  const date = new Date(data);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatarMes(mesKey: string): string {
+  const [ano, mes] = mesKey.split("-").map(Number);
+
+  return new Date(ano, mes - 1, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function CMScreen() {
   const { user, signOut } = useAuth();
-
+  const [exportando, setExportando] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoCM[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     em_investigacao: 0,
     veridicos: 0,
   });
+  const [mesSelecionado, setMesSelecionado] = useState("TODOS");
+  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+  const [mesDropdownAberto, setMesDropdownAberto] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filtro, setFiltro] = useState("TODOS");
@@ -408,19 +429,42 @@ export default function CMScreen() {
     null,
   );
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const mesesDisponiveis = useMemo(() => {
+    const meses = new Set(
+      notificacoes.map((n) => getMesKey(n.data_envio)).filter(Boolean),
+    );
 
+    return Array.from(meses)
+      .sort((a, b) => b.localeCompare(a))
+      .map((valor) => ({
+        valor,
+        nome: formatarMes(valor),
+      }));
+  }, [notificacoes]);
+
+  const notificacoesDoMes = useMemo(() => {
+    if (mesSelecionado === "TODOS") return notificacoes;
+
+    return notificacoes.filter(
+      (n) => getMesKey(n.data_envio) === mesSelecionado,
+    );
+  }, [notificacoes, mesSelecionado]);
   const statsCards = useMemo(
     () => ({
-      total: notificacoes.length,
-      pendentes: notificacoes.filter((n) => n.status === "EM ANDAMENTO").length,
-      investigacao: notificacoes.filter((n) => n.status === "EM INVESTIGAÇÃO")
+      total: notificacoesDoMes.length,
+      pendentes: notificacoesDoMes.filter((n) => n.status === "EM ANDAMENTO")
         .length,
-      veridicos: notificacoes.filter((n) => n.status === "VERÍDICO").length,
-      naoVeridicos: notificacoes.filter((n) => n.status === "NÃO VERÍDICO")
+      investigacao: notificacoesDoMes.filter(
+        (n) => n.status === "EM INVESTIGAÇÃO",
+      ).length,
+      veridicos: notificacoesDoMes.filter((n) => n.status === "VERÍDICO")
         .length,
-      encerradas: notificacoes.filter((n) => n.status === "ENCERRADO").length,
+      naoVeridicos: notificacoesDoMes.filter((n) => n.status === "NÃO VERÍDICO")
+        .length,
+      encerradas: notificacoesDoMes.filter((n) => n.status === "ENCERRADO")
+        .length,
     }),
-    [notificacoes],
+    [notificacoesDoMes],
   );
 
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -448,9 +492,10 @@ export default function CMScreen() {
   }, [fetchData]);
 
   const notifFiltradas = useMemo(() => {
-    if (filtro === "TODOS") return notificacoes;
-    return notificacoes.filter((n) => n.status === filtro);
-  }, [notificacoes, filtro]);
+    if (filtro === "TODOS") return notificacoesDoMes;
+
+    return notificacoesDoMes.filter((n) => n.status === filtro);
+  }, [notificacoesDoMes, filtro]);
 
   async function handleStatusChange(id: number, novoStatus: StatusCM) {
     setLoadingId(id);
@@ -495,6 +540,42 @@ export default function CMScreen() {
 
   const municipio = (user as any)?.municipio ?? "Município";
   const nome = (user as any)?.nome ?? "Coordenador";
+
+  async function handleExportarNotificacoes() {
+    try {
+      setExportando(true);
+
+      const blob = await exportarRelatorioPDF();
+
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "relatorio_notificacoes_cm.pdf";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert(
+          "Relatório gerado",
+          "O PDF foi recebido, mas precisamos implementar o salvamento ou compartilhamento do arquivo no dispositivo.",
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar as notificações.",
+      );
+    } finally {
+      setExportando(false);
+    }
+  }
 
   return (
     <View style={s.screen}>
@@ -600,50 +681,164 @@ export default function CMScreen() {
             </View>
           </View>
         )}
-        {/* Botão de Criar Conta UBS */}
+        {/* Acesso ao mapa */}
         <TouchableOpacity
           style={s.primaryBtn}
-          onPress={() => router.push("./createUbs" as any)}
+          onPress={() => router.push("/(cm)/map")}
           activeOpacity={0.8}
         >
           <View style={s.primaryBtnInner}>
-            <Feather name="home" size={18} color={Colors.white} />
+            <Feather name="map" size={22} color={Colors.white} />
+
             <View style={{ flex: 1 }}>
-              <Text style={s.primaryBtnLabel}>Criar Conta UBS</Text>
+              <Text style={s.primaryBtnLabel}>Mapa</Text>
               <Text style={s.primaryBtnSub}>
-                Cadastrar nova unidade de saúde
+                Visualizar notificações no mapa do município
               </Text>
             </View>
+
             <Feather name="chevron-right" size={20} color={Colors.white} />
           </View>
         </TouchableOpacity>
         {/* Filtros */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.filterScroll}
-        >
-          {FILTROS.map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[s.filterChip, filtro === f && s.filterChipActive]}
-              onPress={() => setFiltro(f)}
-              activeOpacity={0.8}
+        <View style={s.filtersWrapper}>
+          {/* Dropdown de mês */}
+          <View style={s.monthFilterContainer}>
+            <Pressable
+              style={[
+                s.agentFilterButton,
+                mesSelecionado !== "TODOS" && s.monthFilterButtonSelected,
+              ]}
+              onPress={() => setMostrarOpcoesMes((visivel) => !visivel)}
             >
+              <Feather
+                name="calendar"
+                size={16}
+                color={
+                  mesSelecionado !== "TODOS" ? Colors.white : Colors.gray400
+                }
+              />
+
               <Text
                 style={[
-                  s.filterChipText,
-                  filtro === f && s.filterChipTextActive,
+                  s.agentDropdownText,
+                  mesSelecionado !== "TODOS" && s.monthFilterButtonTextSelected,
                 ]}
+                numberOfLines={1}
               >
-                {f === "TODOS" ? "Todos" : (STATUS_CFG[f]?.label ?? f)}
+                {mesSelecionado === "TODOS"
+                  ? "Todos os meses"
+                  : (mesesDisponiveis.find(
+                      (mes) => mes.valor === mesSelecionado,
+                    )?.nome ?? "Todos os meses")}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+
+              <Feather
+                name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={
+                  mesSelecionado !== "TODOS" ? Colors.white : Colors.gray400
+                }
+              />
+            </Pressable>
+
+            {mostrarOpcoesMes && (
+              <View style={s.agentDropdown}>
+                <ScrollView
+                  nestedScrollEnabled
+                  style={{ maxHeight: 220 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {[
+                    { valor: "TODOS", nome: "Todos os meses" },
+                    ...mesesDisponiveis,
+                  ].map((mes) => {
+                    const selecionado = mesSelecionado === mes.valor;
+
+                    return (
+                      <Pressable
+                        key={mes.valor}
+                        style={[
+                          s.agentOption,
+                          selecionado && s.agentOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setMesSelecionado(mes.valor);
+                          setMostrarOpcoesMes(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            s.agentOptionText,
+                            selecionado && s.agentOptionTextSelected,
+                          ]}
+                        >
+                          {mes.nome}
+                        </Text>
+
+                        {selecionado && (
+                          <Feather
+                            name="check"
+                            size={16}
+                            color={Colors.teal800}
+                          />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Filtros de status — uma única lista horizontal */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.filterContent}
+          >
+            {FILTROS.map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[s.filterChip, filtro === f && s.filterChipActive]}
+                onPress={() => setFiltro(f)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    s.filterChipText,
+                    filtro === f && s.filterChipTextActive,
+                  ]}
+                >
+                  {f === "TODOS"
+                    ? "Todos os status"
+                    : (STATUS_CFG[f]?.label ?? f)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={s.exportarContainer}>
+          <TouchableOpacity
+            style={s.exportarIcone}
+            onPress={handleExportarNotificacoes}
+            disabled={exportando || loading}
+            activeOpacity={0.6}
+          >
+            {exportando ? (
+              <ActivityIndicator size="small" color={Colors.teal600} />
+            ) : (
+              <Feather name="download" size={19} color={Colors.teal600} />
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Lista */}
         <Text style={s.sectionLabel}>
           Notificações — todo o município
+          {mesSelecionado !== "TODOS"
+            ? ` · ${formatarMes(mesSelecionado)}`
+            : ""}
           {filtro !== "TODOS"
             ? ` · ${STATUS_CFG[filtro]?.label ?? filtro}`
             : ""}
@@ -777,8 +972,19 @@ const s = StyleSheet.create({
   },
 
   // Filtros
-  filterScroll: { marginBottom: Spacing.lg },
+  filterChipActive: {
+    backgroundColor: Colors.teal600,
+    borderColor: Colors.teal600,
+  },
+
+  filterContent: {
+    alignItems: "center",
+  },
+
   filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: Spacing.md,
     paddingVertical: 7,
     borderRadius: 20,
@@ -787,9 +993,28 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     marginRight: Spacing.sm,
   },
-  filterChipActive: {
-    backgroundColor: Colors.teal600,
-    borderColor: Colors.teal600,
+
+  filterDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: Colors.gray100,
+    marginRight: Spacing.sm,
+  },
+  monthFilterTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+
+  monthFilterTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray600,
+  },
+
+  monthFilterContent: {
+    paddingBottom: 2,
   },
   filterChipText: {
     fontSize: FontSize.xs,
@@ -797,7 +1022,150 @@ const s = StyleSheet.create({
     fontWeight: "500",
   },
   filterChipTextActive: { color: Colors.white, fontWeight: "700" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
 
+  monthDropdown: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: Spacing.md,
+  },
+
+  monthDropdownTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: Spacing.sm,
+    color: Colors.gray900,
+  },
+
+  filtersWrapper: {
+    marginBottom: Spacing.lg,
+    position: "relative",
+    zIndex: 10,
+  },
+
+  agentFilterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.white,
+  },
+
+  exportarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.teal600,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.lg,
+  },
+
+  exportarBtnText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+  },
+
+  agentDropdownText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+    textTransform: "capitalize",
+  },
+  exportarContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+
+  exportarIcone: {
+    padding: Spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  agentDropdown: {
+    position: "absolute",
+    top: 44,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    overflow: "hidden",
+    elevation: 8,
+    zIndex: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+
+  agentOption: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.sm,
+  },
+
+  agentOptionSelected: {
+    backgroundColor: Colors.teal50,
+  },
+
+  agentOptionText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+    textTransform: "capitalize",
+  },
+
+  agentOptionTextSelected: {
+    color: Colors.teal800,
+    fontWeight: "700",
+  },
+
+  filterScroll: {
+    marginBottom: 0,
+  },
+  monthDropdownOption: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray100,
+  },
+
+  monthDropdownOptionText: {
+    fontSize: 14,
+    color: Colors.gray600,
+    textTransform: "capitalize",
+  },
+
+  monthDropdownOptionSelected: {
+    color: Colors.teal600,
+    fontWeight: "700",
+  },
   // Section label
   sectionLabel: {
     fontSize: FontSize.xs,
@@ -807,7 +1175,22 @@ const s = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: Spacing.md,
   },
+  monthFilterContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.sm,
+    position: "relative",
+    zIndex: 9,
+  },
 
+  monthFilterButtonSelected: {
+    backgroundColor: Colors.teal800,
+    borderColor: Colors.teal800,
+  },
+
+  monthFilterButtonTextSelected: {
+    color: Colors.white,
+  },
   // Card
   card: {
     backgroundColor: Colors.white,

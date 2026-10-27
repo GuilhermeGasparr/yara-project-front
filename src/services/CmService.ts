@@ -1,6 +1,7 @@
 import { getItem } from "@/utils/storage";
 
 const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "http://localhost:8000";
 
 const SKIP = { "ngrok-skip-browser-warning": "true" };
 
@@ -27,6 +28,9 @@ export interface NotificacaoCM {
   data_envio: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
+  endereco?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   continuidade_situacao: string;
   descricao: string;
   acs_ace_id: number;
@@ -44,10 +48,19 @@ export interface DashboardStats {
 
 export async function listarNotificacoesCM(): Promise<NotificacaoCM[]> {
   const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/cm/listar_notificacoes`, { headers });
+
+  const res = await fetch(`${BASE_URL}/cm/listar_notificacoes`, {
+    headers,
+  });
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? "Erro ao buscar notificações.");
-  return (data.notificacoes ?? []) as NotificacaoCM[];
+  console.log("[DEBUG] Primeira notificação recebida:", data.Notificacao?.[0]);
+
+  if (!res.ok) {
+    throw new Error(data.detail ?? "Erro ao buscar notificações.");
+  }
+
+  return (data.Notificacao ?? []) as NotificacaoCM[];
 }
 
 // ─── GET /cm/dashboard_stats ──────────────────────────────────────────────────
@@ -73,6 +86,9 @@ async function patchStatus(
   endpoint: StatusEndpoint,
 ): Promise<void> {
   const headers = await authHeader();
+  console.log("[DEBUG] ID enviado:", id);
+  console.log("[DEBUG] Endpoint:", endpoint);
+  console.log("[DEBUG] URL:", `${BASE_URL}/cm/notificacoes/${id}/${endpoint}`);
 
   const res = await fetch(`${BASE_URL}/cm/notificacoes/${id}/${endpoint}`, {
     method: "PATCH",

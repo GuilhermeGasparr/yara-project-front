@@ -555,10 +555,25 @@ export default function RegionalHomeScreen() {
             </View>
           </View>
         )}
-        <RegionalAlert
-          emInvestigacao={dashboard.emInvestigacao}
-          municipiosEmInvestigacao={dashboard.municipiosEmInvestigacao}
-        />
+    
+        <TouchableOpacity
+          style={styles.mapButton}
+          onPress={() => router.push("/(regional)/map")}
+          activeOpacity={0.85}
+        >
+          <View style={styles.mapIconWrap}>
+            <Feather name="map" size={18} color={Colors.teal600} />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.mapButtonTitle}>Mapa</Text>
+            <Text style={styles.mapButtonSub}>
+              Visualize as notificações no mapa
+            </Text>
+          </View>
+
+          <Feather name="chevron-right" size={20} color={Colors.gray400} />
+        </TouchableOpacity>
 
         {/* ─── Criar conta Coordenador Municipal ─────────────────────────── */}
         <TouchableOpacity
@@ -861,6 +876,41 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+
+  mapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.teal600,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+
+  mapIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.teal50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mapButtonTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray800,
+  },
+
+  mapButtonSub: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
   },
 
   categoryBadge: {

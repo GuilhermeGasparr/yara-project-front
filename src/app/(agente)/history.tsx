@@ -27,7 +27,8 @@ const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO
 
 export default function HistoryScreen() {
   const { width } = useWindowDimensions();
-
+  const [mesFiltro, setMesFiltro] = useState("Todos os meses");
+  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [filtro, setFiltro] = useState("Todos");
   const [selectedNotification, setSelectedNotification] =
@@ -63,16 +64,62 @@ export default function HistoryScreen() {
   }, [carregarNotificacoes]);
 
   const notificacoesFiltradas = useMemo(() => {
-    if (filtro === "Todos") {
-      return notificacoes;
-    }
+    let resultado = notificacoes;
 
+    // Filtro por categoria ou status
     if (filtro === "EM INVESTIGAÇÃO") {
-      return notificacoes.filter((item) => item.status === "EM INVESTIGAÇÃO");
+      resultado = resultado.filter((item) => item.status === "EM INVESTIGAÇÃO");
+    } else if (filtro !== "Todos") {
+      resultado = resultado.filter((item) => item.categoria === filtro);
     }
 
-    return notificacoes.filter((item) => item.categoria === filtro);
-  }, [notificacoes, filtro]);
+    // Filtro por mês
+    if (mesFiltro !== "Todos os meses") {
+      resultado = resultado.filter((item) => {
+        if (!item.data_envio) return false;
+
+        const data = new Date(item.data_envio);
+
+        if (Number.isNaN(data.getTime())) return false;
+
+        const valor = `${data.getFullYear()}-${String(
+          data.getMonth() + 1,
+        ).padStart(2, "0")}`;
+
+        return valor === mesFiltro;
+      });
+    }
+
+    return resultado;
+  }, [notificacoes, filtro, mesFiltro]);
+
+  const mesesDisponiveis = useMemo(() => {
+    const meses = new Map<string, string>();
+
+    notificacoes.forEach((item) => {
+      if (!item.data_envio) return;
+
+      const data = new Date(item.data_envio);
+
+      if (Number.isNaN(data.getTime())) return;
+
+      const valor = `${data.getFullYear()}-${String(
+        data.getMonth() + 1,
+      ).padStart(2, "0")}`;
+
+      const nome = data.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      });
+
+      meses.set(valor, nome.charAt(0).toUpperCase() + nome.slice(1));
+    });
+
+    return Array.from(meses, ([valor, nome]) => ({
+      valor,
+      nome,
+    })).sort((a, b) => b.valor.localeCompare(a.valor));
+  }, [notificacoes]);
 
   const renderNotificacao = ({ item }: { item: Notificacao }) => {
     const categoriaStyle = getCategoriaStyle(item.categoria);
@@ -178,39 +225,128 @@ export default function HistoryScreen() {
       </View>
 
       {/* FILTROS */}
-      <View style={styles.filterContainer}>
-        <FlatList
-          horizontal
-          data={filtros}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-          renderItem={({ item }) => {
-            const selected = filtro === item;
+      {!selectedNotification && (
+        <>
+          <View style={styles.filterContainer}>
+            <FlatList
+              horizontal
+              data={filtros}
+              keyExtractor={(item) => item}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContent}
+              renderItem={({ item }) => {
+                const selected = filtro === item;
 
-            return (
-              <Pressable
-                onPress={() => setFiltro(item)}
-                style={[
-                  styles.filterButton,
-                  selected && styles.filterButtonSelected,
-                ]}
-              >
-                <Text
+                return (
+                  <Pressable
+                    onPress={() => setFiltro(item)}
+                    style={[
+                      styles.filterButton,
+                      selected && styles.filterButtonSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        selected && styles.filterTextSelected,
+                        isSmallScreen && styles.filterTextSmall,
+                      ]}
+                    >
+                      {item === "Todos" ? "Todos" : formatarCategoria(item)}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+          <View style={styles.monthFilterContainer}>
+            <Pressable
+              style={styles.monthFilterButton}
+              onPress={() => setMostrarOpcoesMes((visivel) => !visivel)}
+            >
+              <Feather name="calendar" size={16} color={Colors.teal800} />
+
+              <Text style={styles.monthFilterText} numberOfLines={1}>
+                {mesFiltro === "Todos os meses"
+                  ? "Todos os meses"
+                  : (mesesDisponiveis.find((mes) => mes.valor === mesFiltro)
+                      ?.nome ?? "Todos os meses")}
+              </Text>
+
+              <Feather
+                name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={Colors.teal800}
+              />
+            </Pressable>
+
+            {mostrarOpcoesMes && (
+              <View style={styles.monthDropdown}>
+                <Pressable
                   style={[
-                    styles.filterText,
-                    selected && styles.filterTextSelected,
-                    isSmallScreen && styles.filterTextSmall,
+                    styles.monthOption,
+                    mesFiltro === "Todos os meses" &&
+                      styles.monthOptionSelected,
                   ]}
+                  onPress={() => {
+                    setMesFiltro("Todos os meses");
+                    setMostrarOpcoesMes(false);
+                  }}
                 >
-                  {item === "Todos" ? "Todos" : formatarCategoria(item)}
-                </Text>
-              </Pressable>
-            );
-          }}
-        />
-      </View>
+                  <Text
+                    style={[
+                      styles.monthOptionText,
+                      mesFiltro === "Todos os meses" &&
+                        styles.monthOptionTextSelected,
+                    ]}
+                  >
+                    Todos os meses
+                  </Text>
 
+                  {mesFiltro === "Todos os meses" && (
+                    <Feather name="check" size={16} color={Colors.teal800} />
+                  )}
+                </Pressable>
+
+                {mesesDisponiveis.map((mes) => {
+                  const selecionado = mesFiltro === mes.valor;
+
+                  return (
+                    <Pressable
+                      key={mes.valor}
+                      style={[
+                        styles.monthOption,
+                        selecionado && styles.monthOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setMesFiltro(mes.valor);
+                        setMostrarOpcoesMes(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.monthOptionText,
+                          selecionado && styles.monthOptionTextSelected,
+                        ]}
+                      >
+                        {mes.nome}
+                      </Text>
+
+                      {selecionado && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal800}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </>
+      )}
       {/* CONTEÚDO */}
       {loading ? (
         <View style={styles.centerState}>
@@ -700,7 +836,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: Spacing.sm,
   },
-  
+
   backButton: {
     width: 38,
     height: 38,
@@ -806,6 +942,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     justifyContent: "flex-end",
+    zIndex: 100,
+    elevation: 100,
   },
 
   modalCard: {
@@ -850,7 +988,81 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.gray600,
   },
+  monthFilterContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    position: "relative",
+    zIndex: 1,
+    elevation: 1,
+  },
 
+  monthFilterButton: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    backgroundColor: Colors.white,
+  },
+
+  monthFilterText: {
+    flexShrink: 1,
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.teal800,
+  },
+
+  monthDropdown: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    width: 260,
+    maxWidth: "100%",
+    maxHeight: 260,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: "#D5E2DF",
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+
+  monthOption: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5EEEB",
+  },
+
+  monthOptionSelected: {
+    backgroundColor: "#E8F5F1",
+  },
+
+  monthOptionText: {
+    flex: 1,
+    marginRight: 8,
+    fontSize: FontSize.sm,
+    color: Colors.gray600,
+  },
+
+  monthOptionTextSelected: {
+    color: Colors.teal800,
+    fontWeight: "700",
+  },
   modalCloseButton: {
     width: 38,
     height: 38,

@@ -22,6 +22,7 @@ import { getItem } from "@/utils/storage";
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "http://localhost:8000";
 
 async function criarCoordenadorMunicipal(payload: {
   nome: string;

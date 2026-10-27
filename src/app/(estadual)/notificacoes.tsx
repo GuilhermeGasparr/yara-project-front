@@ -59,9 +59,10 @@ function formatarStatus(status: string) {
 
     case "ENCERRADO":
       return "Encerrado";
+
     case "PENDENTE":
-    case "EM ANDAMENTO":
       return "Pendente";
+
     default:
       return status || "Não informado";
   }
@@ -179,9 +180,7 @@ function NotificationCard({ item, onPress }: NotificationCardProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.notificationCard,
-
         isPending && styles.notificationCardPending,
-
         pressed && styles.notificationCardPressed,
       ]}
     >
@@ -284,9 +283,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
   const [visible, setVisible] = useState(false);
 
   const backdropAnim = useRef(new Animated.Value(0)).current;
-
   const translateY = useRef(new Animated.Value(40)).current;
-
   const scaleAnim = useRef(new Animated.Value(0.96)).current;
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
@@ -327,6 +324,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
       setExportandoPDF(false);
     }
   }
+
   useEffect(() => {
     if (!item) return;
 
@@ -338,14 +336,12 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
         duration: 220,
         useNativeDriver: true,
       }),
-
       Animated.spring(translateY, {
         toValue: 0,
         damping: 18,
         stiffness: 180,
         useNativeDriver: true,
       }),
-
       Animated.spring(scaleAnim, {
         toValue: 1,
         damping: 18,
@@ -362,13 +358,11 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
         duration: 180,
         useNativeDriver: true,
       }),
-
       Animated.timing(translateY, {
         toValue: 30,
         duration: 180,
         useNativeDriver: true,
       }),
-
       Animated.timing(scaleAnim, {
         toValue: 0.97,
         duration: 180,
@@ -395,12 +389,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
   });
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={close}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={close}>
       <View style={styles.modalRoot}>
         <Animated.View
           style={[
@@ -443,6 +432,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
                 Notificação #{String(item.id).padStart(4, "0")}
               </Text>
             </View>
+
             <TouchableOpacity
               style={styles.exportButton}
               onPress={handleExportarPDF}
@@ -455,6 +445,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
                 <Feather name="download" size={18} color="#FFFFFF" />
               )}
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.closeBtn}
               onPress={close}
@@ -476,8 +467,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
                 style={[
                   styles.statusBadge,
                   {
-                    backgroundColor: getStatusStyle(item.status)
-                      .backgroundColor,
+                    backgroundColor: getStatusStyle(item.status).backgroundColor,
                   },
                 ]}
               >
@@ -500,20 +490,14 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
               </Text>
 
               <DetailRow label="Tipo de evento" value={item.tipo_evento} />
-
               <DetailRow label="Categoria" value={item.categoria} />
-
               <DetailRow label="Data de envio" value={dataFormatada} />
-
               <DetailRow label="Estado" value={item.estado ?? ""} />
-
               <DetailRow label="Município" value={item.municipio ?? ""} />
-
               <DetailRow
                 label="Local da ocorrência"
                 value={item.local_ocorrencia}
               />
-
               <DetailRow
                 label="Pessoas / animais afetados"
                 value={String(item.pessoas_animais_infectados_afetados)}
@@ -542,11 +526,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
               </View>
             </View>
 
-            <View
-              style={{
-                height: Spacing.xl,
-              }}
-            />
+            <View style={{ height: Spacing.xl }} />
           </ScrollView>
 
           <View style={styles.detailFooter}>
@@ -574,6 +554,10 @@ export default function EstadualNotificationsScreen() {
 
   const [coadsFiltro, setCoadsFiltro] = useState("TODAS");
   const [mostrarOpcoesCoads, setMostrarOpcoesCoads] = useState(false);
+
+  // Estados do Filtro por Mês
+  const [mesFiltro, setMesFiltro] = useState("TODOS");
+  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
 
   const [selectedNotification, setSelectedNotification] =
     useState<Notificacao | null>(null);
@@ -609,6 +593,35 @@ export default function EstadualNotificationsScreen() {
           .filter((coads): coads is string => Boolean(coads)),
       ),
     ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [notificacoes]);
+
+  // Meses disponíveis extraídos das notificações
+  const mesesDisponiveis = useMemo(() => {
+    const meses = new Map<string, string>();
+
+    notificacoes.forEach((item) => {
+      if (!item.data_envio) return;
+
+      const data = new Date(item.data_envio);
+
+      if (Number.isNaN(data.getTime())) return;
+
+      const valor = `${data.getFullYear()}-${String(
+        data.getMonth() + 1,
+      ).padStart(2, "0")}`;
+
+      const nome = data.toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric",
+      });
+
+      meses.set(valor, nome.charAt(0).toUpperCase() + nome.slice(1));
+    });
+
+    return Array.from(meses, ([valor, nome]) => ({
+      valor,
+      nome,
+    })).sort((a, b) => b.valor.localeCompare(a.valor));
   }, [notificacoes]);
 
   function normalizarStatusFiltro(status?: string) {
@@ -655,6 +668,24 @@ export default function EstadualNotificationsScreen() {
         coadsFiltro === "TODAS" ||
         normalizar(item.coads) === normalizar(coadsFiltro);
 
+      // Filtro por Mês
+      let correspondeMes = true;
+      if (mesFiltro !== "TODOS") {
+        if (!item.data_envio) {
+          correspondeMes = false;
+        } else {
+          const data = new Date(item.data_envio);
+          if (Number.isNaN(data.getTime())) {
+            correspondeMes = false;
+          } else {
+            const valorMes = `${data.getFullYear()}-${String(
+              data.getMonth() + 1,
+            ).padStart(2, "0")}`;
+            correspondeMes = valorMes === mesFiltro;
+          }
+        }
+      }
+
       const correspondeBusca =
         !buscaNormalizada || textoBusca.includes(buscaNormalizada);
 
@@ -670,10 +701,11 @@ export default function EstadualNotificationsScreen() {
         correspondeBusca &&
         correspondeCategoria &&
         correspondeStatus &&
-        correspondeCoads
+        correspondeCoads &&
+        correspondeMes
       );
     });
-  }, [notificacoes, busca, categoriaFiltro, statusFiltro, coadsFiltro]);
+  }, [notificacoes, busca, categoriaFiltro, statusFiltro, coadsFiltro, mesFiltro]);
 
   return (
     <View style={styles.screen}>
@@ -689,7 +721,6 @@ export default function EstadualNotificationsScreen() {
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerLabel}>Vigilância Estadual</Text>
-
           <Text style={styles.headerTitle}>Notificações</Text>
         </View>
       </View>
@@ -735,7 +766,10 @@ export default function EstadualNotificationsScreen() {
               styles.coadsButton,
               coadsFiltro !== "TODAS" && styles.coadsButtonActive,
             ]}
-            onPress={() => setMostrarOpcoesCoads((anterior) => !anterior)}
+            onPress={() => {
+              setMostrarOpcoesCoads((anterior) => !anterior);
+              setMostrarOpcoesMes(false);
+            }}
           >
             <Text
               style={[
@@ -783,6 +817,110 @@ export default function EstadualNotificationsScreen() {
                         ]}
                       >
                         {coads === "TODAS" ? "Todas as COADS" : coads}
+                      </Text>
+
+                      {selecionada && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal600}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
+        {/* Filtro de MÊS (Abaixo de COADS) */}
+        <View style={styles.coadsFilterContainer}>
+          <Text style={styles.filterLabel}>Mês</Text>
+
+          <Pressable
+            style={[
+              styles.coadsButton,
+              mesFiltro !== "TODOS" && styles.coadsButtonActive,
+            ]}
+            onPress={() => {
+              setMostrarOpcoesMes((anterior) => !anterior);
+              setMostrarOpcoesCoads(false);
+            }}
+          >
+            <Text
+              style={[
+                styles.coadsButtonText,
+                mesFiltro !== "TODOS" && styles.coadsButtonTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {mesFiltro === "TODOS"
+                ? "Todos os meses"
+                : mesesDisponiveis.find((m) => m.valor === mesFiltro)?.nome ||
+                  mesFiltro}
+            </Text>
+
+            <Feather
+              name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={mesFiltro !== "TODOS" ? Colors.white : Colors.teal600}
+            />
+          </Pressable>
+
+          {mostrarOpcoesMes && (
+            <View style={styles.coadsDropdown}>
+              <ScrollView
+                nestedScrollEnabled
+                style={styles.coadsDropdownScroll}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Pressable
+                  style={[
+                    styles.coadsOption,
+                    mesFiltro === "TODOS" && styles.coadsOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setMesFiltro("TODOS");
+                    setMostrarOpcoesMes(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.coadsOptionText,
+                      mesFiltro === "TODOS" && styles.coadsOptionTextSelected,
+                    ]}
+                  >
+                    Todos os meses
+                  </Text>
+
+                  {mesFiltro === "TODOS" && (
+                    <Feather name="check" size={16} color={Colors.teal600} />
+                  )}
+                </Pressable>
+
+                {mesesDisponiveis.map((mes) => {
+                  const selecionada = mesFiltro === mes.valor;
+
+                  return (
+                    <Pressable
+                      key={mes.valor}
+                      style={[
+                        styles.coadsOption,
+                        selecionada && styles.coadsOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setMesFiltro(mes.valor);
+                        setMostrarOpcoesMes(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.coadsOptionText,
+                          selecionada && styles.coadsOptionTextSelected,
+                        ]}
+                      >
+                        {mes.nome}
                       </Text>
 
                       {selecionada && (
@@ -907,11 +1045,7 @@ export default function EstadualNotificationsScreen() {
           ))
         )}
 
-        <View
-          style={{
-            height: Spacing.xxl,
-          }}
-        />
+        <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
       <NotificacaoDetailModal
@@ -1043,6 +1177,7 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: Colors.white,
   },
+
   exportButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1139,6 +1274,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+
   resultsHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1348,60 +1484,60 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
+    borderBottomColor: Colors.gray100,
   },
 
   detailCategoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    marginBottom: 5,
+    gap: 6,
+    marginBottom: 4,
   },
 
   detailDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   detailCategory: {
     fontSize: FontSize.xs,
     fontWeight: "700",
-    color: Colors.gray400,
+    color: Colors.gray600,
     textTransform: "uppercase",
-    letterSpacing: 0.7,
   },
 
   detailTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: "800",
+    fontSize: FontSize.lg,
+    fontWeight: "700",
     color: Colors.gray900,
   },
 
   detailId: {
     fontSize: FontSize.xs,
     color: Colors.gray400,
-    marginTop: 4,
+    marginTop: 2,
   },
 
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.gray50,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.gray100,
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: 8,
   },
 
   closeBtnText: {
-    fontSize: 28,
-    lineHeight: 30,
-    fontWeight: "300",
+    fontSize: 20,
     color: Colors.gray600,
+    fontWeight: "600",
+    lineHeight: 20,
   },
 
   detailScroll: {
-    flexGrow: 0,
+    flex: 1,
   },
 
   detailContent: {
@@ -1410,12 +1546,12 @@ const styles = StyleSheet.create({
 
   detailStatusRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.lg,
     paddingBottom: Spacing.md,
-    marginBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
+    borderBottomColor: Colors.gray100,
   },
 
   detailSection: {
@@ -1423,60 +1559,61 @@ const styles = StyleSheet.create({
   },
 
   detailSectionTitle: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     fontWeight: "700",
-    color: Colors.gray900,
+    color: Colors.gray400,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
     marginBottom: Spacing.sm,
   },
 
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray50,
-    gap: Spacing.md,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.gray100,
   },
 
   detailLabel: {
-    flex: 0.9,
     fontSize: FontSize.sm,
-    color: Colors.gray400,
+    color: Colors.gray600,
   },
 
   detailValue: {
-    flex: 1.4,
     fontSize: FontSize.sm,
     fontWeight: "600",
     color: Colors.gray900,
+    maxWidth: "60%",
     textAlign: "right",
   },
 
   descriptionBox: {
     backgroundColor: Colors.gray50,
-    borderRadius: Radius.md,
     padding: Spacing.md,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.06)",
+    borderColor: Colors.gray100,
   },
 
   descriptionText: {
     fontSize: FontSize.sm,
-    lineHeight: 21,
     color: Colors.gray600,
+    lineHeight: 20,
   },
 
   detailFooter: {
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: Colors.gray50,
+    borderTopColor: Colors.gray100,
+    backgroundColor: Colors.white,
   },
 
   detailCloseButton: {
     backgroundColor: Colors.teal600,
+    paddingVertical: 14,
     borderRadius: Radius.md,
-    paddingVertical: 13,
     alignItems: "center",
   },
 

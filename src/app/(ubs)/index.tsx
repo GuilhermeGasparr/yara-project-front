@@ -60,7 +60,20 @@ function getInitials(nome: string): string {
 }
 
 // ─── Ícones ───────────────────────────────────────────────────────────────────
-
+function MapIcon() {
+  return (
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Feather name="map" size={18} color={Colors.teal600} />
+    </View>
+  );
+}
 function PlusIcon() {
   return (
     <View
@@ -695,7 +708,14 @@ export default function UbsHomeScreen() {
     try {
       isRefresh ? setRefreshing(true) : setLoading(true);
       const data = await listarNotificacoesUBS();
-      setNotificacoes(data);
+      setNotificacoes(
+        data.map((n) => ({
+          ...n,
+          endereco: n.endereco ?? undefined,
+          latitude: n.latitude ?? undefined,
+          longitude: n.longitude ?? undefined,
+        })),
+      );
     } catch (err) {
       Alert.alert(
         "Erro",
@@ -714,12 +734,24 @@ export default function UbsHomeScreen() {
   );
   const handleStatusUpdated = useCallback(async (id: number) => {
     const data = await listarNotificacoesUBS();
-    setNotificacoes(data);
+    setNotificacoes(
+      data.map((n) => ({
+        ...n,
+        endereco: n.endereco ?? undefined,
+        latitude: n.latitude ?? undefined,
+        longitude: n.longitude ?? undefined,
+      })),
+    );
 
     const atualizada = data.find((n) => n.id === id);
 
     if (atualizada) {
-      setNotificacaoSelecionada(atualizada);
+      setNotificacaoSelecionada({
+        ...atualizada,
+        endereco: atualizada.endereco ?? undefined,
+        latitude: atualizada.latitude ?? undefined,
+        longitude: atualizada.longitude ?? undefined,
+      });
     }
   }, []);
   return (
@@ -855,7 +887,23 @@ export default function UbsHomeScreen() {
             style={styles.gridItem}
           />
         </View>
+        <View style={styles.gridRow}>
+          <QuickActionButton
+            label="Notificações"
+            sublabel="Ver todas as ocorrências"
+            icon={<BellIcon />}
+            onPress={() => router.navigate("./notificacoes")}
+            style={styles.gridItem}
+          />
 
+          <QuickActionButton
+            label="Mapa"
+            sublabel="Visualizar mapa de ocorrências"
+            icon={<MapIcon />}
+            onPress={() => router.navigate("/(ubs)/map")}
+            style={styles.gridItem}
+          />
+        </View>
         {/* Feed */}
         <Text style={styles.sectionLabel}>Atualizações recentes</Text>
 
