@@ -2,8 +2,8 @@ import { getItem } from "@/utils/storage";
 import { normalizarNotificacoes } from "@/utils/status";
 import type { Notificacao } from "./NotificationService";
 
-//const BASE_URL = "https://yara-project.onrender.com";
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "http://localhost:8000";
 
 async function authHeader(): Promise<Record<string, string>> {
   const token = await getItem("sentinela_token");
