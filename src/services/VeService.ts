@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 import type { Notificacao } from "./NotificationService";
 
 const BASE_URL = "https://yara-project.onrender.com";
@@ -26,33 +27,57 @@ export async function listarNotificacoesVE(): Promise<Notificacao[]> {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.detail ?? "Erro ao carregar notificações estaduais.",
-    );
+    throw new Error(data.detail ?? "Erro ao carregar notificações estaduais.");
   }
 
-  return (data["Notificações"] ?? []) as Notificacao[];
+  return normalizarNotificacoes((data["Notificações"] ?? []) as Notificacao[]);
 }
 
-export async function baixarRelatorioPDFVE(): Promise<Blob> {
-const headers = await authHeader();
+export async function baixarRelatorioXlsxVE(): Promise<Blob> {
+  const headers = await authHeader();
 
-const response = await fetch(`${BASE_URL}/ve/exportar_relatorio/pdf`, {
+  const response = await fetch(`${BASE_URL}/ve/exportar_relatorio/xlsx`, {
     method: "GET",
     headers,
   });
 
-if (!response.ok) {
-let mensagem = "Erro ao baixar o relatório estadual.";
+  if (!response.ok) {
+    let mensagem = "Erro ao baixar o relatório estadual.";
 
-try {
-  const data = await response.json();
-  mensagem = data.detail ?? mensagem;
-} catch {}
+    try {
+      const data = await response.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {}
 
-throw new Error(mensagem);
+    throw new Error(mensagem);
+  }
 
+  return response.blob();
 }
 
-return response.blob();
+export async function baixarRelatorioNotificacaoXlsxVE(
+  notificacaoId: number,
+): Promise<Blob> {
+  const headers = await authHeader();
+
+  const response = await fetch(
+    `${BASE_URL}/ve/notificacoes/${notificacaoId}/relatorio_xlsx`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    let mensagem = "Erro ao baixar o relatório da notificação.";
+
+    try {
+      const data = await response.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {}
+
+    throw new Error(mensagem);
+  }
+
+  return response.blob();
 }

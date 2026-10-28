@@ -44,7 +44,7 @@ export function Step6Sucesso({ notificacaoId }: Props) {
       {/* Botões */}
       <TouchableOpacity
         style={styles.btnPrimary}
-        onPress={() => router.replace("/(agente)")}
+        onPress={() => router.replace("/agente")}
         activeOpacity={0.85}
       >
         <Text style={styles.btnPrimaryText}>Voltar ao início</Text>
@@ -52,7 +52,7 @@ export function Step6Sucesso({ notificacaoId }: Props) {
 
       <TouchableOpacity
         style={styles.btnOutline}
-        onPress={() => router.replace("/(agente)/history")}
+        onPress={() => router.replace("/agente/history")}
         activeOpacity={0.8}
       >
         <Text style={styles.btnOutlineText}>Ver minhas notificações</Text>

@@ -22,12 +22,18 @@ import {
   listarNotificacoesUBS,
   NotificacaoUBS,
   NotificacaoStatus,
-  baixarRelatorioPDFUBS,
+  baixarRelatorioNotificacaoXlsxUBS,
+  baixarRelatorioXlsxUBS,
+  deletarNotificacao,
   setEmInvestigacao,
   setVeridico,
   setNaoVeridico,
   setEncerrado,
 } from "@/services/UbsService";
+import { baixarBlob } from "@/utils/downloadFile";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { DeleteNotificationButton } from "@/components/DeleteNotificationButton";
+import { ExportHeaderButton } from "@/components/ExportHeaderButton";
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
 
 export default function NotificacoesUBSScreen() {
@@ -43,7 +49,30 @@ export default function NotificacoesUBSScreen() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarOpcoesAgentes, setMostrarOpcoesAgentes] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const isSmallScreen = width < 380;
+
+  async function handleExportarTodas() {
+    if (exportando) return;
+
+    try {
+      setExportando(true);
+
+      const blob = await baixarRelatorioXlsxUBS();
+
+      baixarBlob(blob, "notificacoes_ubs.xlsx");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar as notificações.",
+      );
+    } finally {
+      setExportando(false);
+    }
+  }
+
   const handleStatusUpdated = useCallback(async (id: number) => {
     const dados = await listarNotificacoesUBS();
 
@@ -53,6 +82,12 @@ export default function NotificacoesUBSScreen() {
 
     setSelectedNotification(atualizada ?? null);
   }, []);
+
+  const handleDeleted = useCallback((id: number) => {
+    setNotificacoes((prev) => prev.filter((n) => n.id !== id));
+    setSelectedNotification(null);
+  }, []);
+
   const carregarNotificacoes = useCallback(async () => {
     try {
       setLoading(true);
@@ -261,9 +296,10 @@ export default function NotificacoesUBSScreen() {
 
         <Text style={styles.headerTitle}>Notificações da UBS</Text>
 
-        <Pressable style={styles.searchButton} hitSlop={10}>
-          <Feather name="search" size={23} color={Colors.white} />
-        </Pressable>
+        <ExportHeaderButton
+          onPress={handleExportarTodas}
+          loading={exportando}
+        />
       </View>
 
       {/* FILTROS */}
@@ -475,6 +511,7 @@ export default function NotificacoesUBSScreen() {
         item={selectedNotification}
         onClose={() => setSelectedNotification(null)}
         onStatusUpdated={handleStatusUpdated}
+        onDeleted={handleDeleted}
       />
     </SafeAreaView>
   );
@@ -513,15 +550,24 @@ function NotificacaoUBSDetailModal({
   item,
   onClose,
   onStatusUpdated,
+  onDeleted,
 }: {
   item: NotificacaoUBS | null;
   onClose: () => void;
   onStatusUpdated: (id: number) => Promise<void>;
+  onDeleted: (id: number) => void;
 }) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
   const [alterandoStatus, setAlterandoStatus] = useState(false);
+  // Troca de status aguardando confirmação (guarda "de" e "para" para o texto).
+  const [statusPendente, setStatusPendente] = useState<{
+    de: string;
+    para: NotificacaoStatus;
+  } | null>(null);
+  const [confirmarStatusAberto, setConfirmarStatusAberto] = useState(false);
   if (!item) return null;
 
+  // Lança erro para o diálogo de confirmação exibir a mensagem.
   async function handleAlterarStatus(novoStatus: NotificacaoStatus) {
     const notificacao = item;
 
@@ -553,13 +599,6 @@ function NotificacaoUBSDetailModal({
       await onStatusUpdated(notificacao.id);
 
       Alert.alert("Sucesso", "Status da notificação atualizado.");
-    } catch (error) {
-      Alert.alert(
-        "Erro ao alterar status",
-        error instanceof Error
-          ? error.message
-          : "Não foi possível alterar o status da notificação.",
-      );
     } finally {
       setAlterandoStatus(false);
     }
@@ -573,14 +612,14 @@ function NotificacaoUBSDetailModal({
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioPDFUBS();
+      const blob = await baixarRelatorioNotificacaoXlsxUBS(notificacaoId);
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `relatorio_ubs_${notificacaoId}.pdf`;
+        link.download = `notificacao_${notificacaoId}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -632,6 +671,15 @@ function NotificacaoUBSDetailModal({
               <Feather name="download" size={20} color={Colors.teal600} />
             )}
           </TouchableOpacity>
+
+          <DeleteNotificationButton
+            protocolo={notificacaoId}
+            style={{ marginRight: Spacing.sm }}
+            onConfirm={async () => {
+              await deletarNotificacao(notificacaoId);
+              onDeleted(notificacaoId);
+            }}
+          />
 
           <Pressable
             style={styles.modalCloseButton}
@@ -719,9 +767,13 @@ function NotificacaoUBSDetailModal({
                         },
                         isActive && styles.acaoBtnActive,
                       ]}
-                      onPress={() =>
-                        handleAlterarStatus(acao.status as NotificacaoStatus)
-                      }
+                      onPress={() => {
+                        setStatusPendente({
+                          de: item.status,
+                          para: acao.status as NotificacaoStatus,
+                        });
+                        setConfirmarStatusAberto(true);
+                      }}
                       disabled={alterandoStatus || isActive}
                       activeOpacity={0.8}
                     >
@@ -815,6 +867,20 @@ function NotificacaoUBSDetailModal({
           <Text style={styles.modalFooterButtonText}>Fechar relatório</Text>
         </Pressable>
       </View>
+
+      <ConfirmActionDialog
+        visible={confirmarStatusAberto}
+        onClose={() => setConfirmarStatusAberto(false)}
+        onConfirm={async () => {
+          if (statusPendente) {
+            await handleAlterarStatus(statusPendente.para);
+          }
+        }}
+        icon="refresh-cw"
+        title="Alterar status?"
+        message={`O status da notificação #${String(notificacaoId).padStart(4, "0")} passará de "${formatarStatus(statusPendente?.de ?? "")}" para "${formatarStatus(statusPendente?.para ?? "")}".`}
+        confirmLabel="Confirmar"
+      />
     </View>
   );
 }
@@ -1010,13 +1076,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: "700",
     color: Colors.white,
-  },
-
-  searchButton: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   filterContainer: {

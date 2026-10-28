@@ -1,5 +1,5 @@
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { useAuth } from "@/context/AuthContext";
+import { getHomeRoute, useAuth } from "@/context/AuthContext";
 import { useLoginForm } from "@/hooks/useLoginForm";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -575,23 +575,13 @@ export default function LoginScreen() {
     setApiError("");
 
     try {
-      await signIn({
+      const loggedUser = await signIn({
         cpf: form.cpf.trim(),
         senha: form.senha,
         tipo_login: form.tipo_login,
       });
 
-      if (form.tipo_login === "ACS/ACE") {
-        router.replace("/(agente)");
-      } else if (form.tipo_login === "UBS") {
-        router.replace("/(ubs)");
-      } else if (form.tipo_login === "CM") {
-        router.replace("/(cm)");
-      } else if (form.tipo_login === "VR") {
-        router.replace("/(regional)");
-      } else if (form.tipo_login === "VE") {
-        router.replace("/(estadual)");
-      }
+      router.replace(getHomeRoute(loggedUser.role));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao autenticar.";
 

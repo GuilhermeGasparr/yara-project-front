@@ -1,4 +1,7 @@
-import { useRef, useState } from "react";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,25 +18,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
-//const BASE_URL = "http://localhost:8000";
 
 const BASE_URL = "https://yara-project.onrender.com";
-async function criarAgente(payload: {
+//const BASE_URL = "http://localhost:8000";
+
+async function criarCoordenadorMunicipal(payload: {
   nome: string;
   cpf: string;
   senha: string;
-  cargo: "ACS" | "ACE";
-  ubs_atuante: number;
-  microarea: string;
+  municipio: string;
 }): Promise<void> {
   const token = await getItem("sentinela_token");
-  const res = await fetch(`${BASE_URL}/ubs/criar_conta_acs_ace`, {
+  const res = await fetch(`${BASE_URL}/vr/criar_conta_coordenador`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -43,75 +41,8 @@ async function criarAgente(payload: {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? "Erro ao criar conta.");
-}
-
-// ─── Cargo selector animado ───────────────────────────────────────────────────
-
-type Cargo = "ACS" | "ACE";
-
-interface CargoSelectorProps {
-  value: Cargo;
-  onChange: (v: Cargo) => void;
-}
-
-function CargoSelector({ value, onChange }: CargoSelectorProps) {
-  const sliderX = useRef(new Animated.Value(0)).current;
-  const [width, setWidth] = useState(0);
-
-  function select(cargo: Cargo) {
-    const toValue = cargo === "ACE" ? width / 2 : 0;
-    Animated.spring(sliderX, {
-      toValue,
-      useNativeDriver: true,
-      bounciness: 5,
-      speed: 14,
-    }).start();
-    onChange(cargo);
-  }
-
-  return (
-    <View
-      style={styles.cargoContainer}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-    >
-      {width > 0 && (
-        <Animated.View
-          style={[
-            styles.cargoSlider,
-            {
-              width: width / 2 - 4,
-              transform: [{ translateX: Animated.add(sliderX, 4) }],
-            },
-          ]}
-        />
-      )}
-      {(["ACS", "ACE"] as Cargo[]).map((cargo) => (
-        <Pressable
-          key={cargo}
-          style={styles.cargoOption}
-          onPress={() => select(cargo)}
-        >
-          <Text
-            style={[
-              styles.cargoText,
-              value === cargo && styles.cargoTextActive,
-            ]}
-          >
-            {cargo === "ACS" ? "🏥  ACS" : "🦟  ACE"}
-          </Text>
-          <Text
-            style={[
-              styles.cargoDesc,
-              value === cargo && styles.cargoDescActive,
-            ]}
-          >
-            {cargo === "ACS" ? "Agente Comunitário" : "Agente de Endemias"}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
+  if (!res.ok)
+    throw new Error(data.detail ?? "Erro ao criar conta do Coordenador.");
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -124,7 +55,7 @@ interface AnimatedFieldProps {
   onChangeText: (v: string) => void;
   error?: string;
   secureTextEntry?: boolean;
-  keyboardType?: "default";
+  keyboardType?: "default" | "numeric";
   autoCapitalize?: "none" | "words";
   returnKeyType?: "next" | "done";
   onSubmitEditing?: () => void;
@@ -187,7 +118,6 @@ function AnimatedField({
       }).start();
     }
 
-    // avisa a tela que o campo perdeu o foco
     onBlurProp?.();
   }
 
@@ -215,7 +145,6 @@ function AnimatedField({
   return (
     <View style={styles.fieldWrap}>
       <Animated.View style={[styles.fieldBox, { borderColor }]}>
-        {/* Label flutuante */}
         <Animated.Text
           style={[
             styles.floatingLabel,
@@ -271,14 +200,16 @@ function AnimatedField({
 function SuccessOverlay({
   nome,
   onDone,
+  onAnother,
 }: {
   nome: string;
   onDone: () => void;
+  onAnother: () => void;
 }) {
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  useState(() => {
+  useEffect(() => {
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
@@ -291,7 +222,7 @@ function SuccessOverlay({
         useNativeDriver: true,
       }),
     ]).start();
-  });
+  }, [scale, opacity]);
 
   return (
     <Animated.View style={[styles.successOverlay, { opacity }]}>
@@ -299,8 +230,8 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          <Text style={{ fontWeight: "700" }}>{nome}</Text> já pode fazer login
-          no NorteAlerta.
+          O(A) coordenador(a) <Text style={{ fontWeight: "700" }}>{nome}</Text>{" "}
+          foi cadastrado(a) com sucesso no sistema.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}
@@ -311,10 +242,12 @@ function SuccessOverlay({
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.successBtnOutline}
-          onPress={() => {}}
+          onPress={onAnother}
           activeOpacity={0.8}
         >
-          <Text style={styles.successBtnOutlineText}>Criar outro agente</Text>
+          <Text style={styles.successBtnOutlineText}>
+            Cadastrar outro Coordenador
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -326,65 +259,66 @@ function SuccessOverlay({
 interface FormState {
   nome: string;
   cpf: string;
+  municipio: string;
   senha: string;
   confirmarSenha: string;
-  microarea: string;
 }
 
 interface FormErrors {
   nome?: string;
   cpf?: string;
+  municipio?: string;
   senha?: string;
   confirmarSenha?: string;
-  microarea?: string;
 }
 
-export default function CreateAgentScreen() {
-  const { user } = useAuth();
-  const ubsId = (user as any)?.ubs_atuante ?? (user as any)?.ubs ?? 0;
+const EMPTY_FORM: FormState = {
+  nome: "",
+  cpf: "",
+  municipio: "",
+  senha: "",
+  confirmarSenha: "",
+};
 
-  const [cargo, setCargo] = useState<Cargo>("ACS");
-  const [form, setForm] = useState<FormState>({
-    nome: "",
-    cpf: "",
-    senha: "",
-    confirmarSenha: "",
-    microarea: "",
-  });
+const NOT_TOUCHED: Record<keyof FormState, boolean> = {
+  nome: false,
+  cpf: false,
+  municipio: false,
+  senha: false,
+  confirmarSenha: false,
+};
+
+export default function CreateCMScreen() {
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({
-    nome: false,
-    cpf: false,
-    senha: false,
-    confirmarSenha: false,
-    microarea: false,
-  });
+  const [touched, setTouched] =
+    useState<Record<keyof FormState, boolean>>(NOT_TOUCHED);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Refs para navegação entre campos
+  // Refs para navegação
   const cpfRef = useRef<TextInput>(null);
+  const municipioRef = useRef<TextInput>(null);
   const senhaRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
-  // ─── Validação ─────────────────────────────────────────────────────────────
-
   function validate(f: FormState): FormErrors {
     const e: FormErrors = {};
-    if (!f.nome.trim()) e.nome = "Nome obrigatório.";
+
+    if (!f.nome.trim()) e.nome = "Nome do Coordenador obrigatório.";
     else if (f.nome.trim().length < 3) e.nome = "Mínimo 3 caracteres.";
 
     if (!f.cpf.trim()) {
       e.cpf = "CPF obrigatório.";
     } else {
       const cpfNumeros = f.cpf.replace(/\D/g, "");
-
       if (cpfNumeros.length !== 11) {
         e.cpf = "O CPF deve possuir 11 dígitos.";
       }
     }
-    if (!f.microarea.trim()) {
-      e.microarea = "Microárea obrigatória.";
+
+    if (!f.municipio.trim()) {
+      e.municipio = "Município obrigatório.";
     }
 
     if (!f.senha) e.senha = "Senha obrigatória.";
@@ -408,35 +342,30 @@ export default function CreateAgentScreen() {
     setErrors(validate(form));
   }
 
-  // ─── Submit ────────────────────────────────────────────────────────────────
-
   async function handleSubmit() {
-    const allTouched = {
+    setTouched({
       nome: true,
       cpf: true,
+      municipio: true,
       senha: true,
       confirmarSenha: true,
-      microarea: true,
-    };
-    setTouched(allTouched);
+    });
     const errs = validate(form);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
     try {
-      await criarAgente({
+      await criarCoordenadorMunicipal({
         nome: form.nome.trim(),
         cpf: form.cpf.replace(/\D/g, ""),
+        municipio: form.municipio.trim(),
         senha: form.senha,
-        cargo,
-        ubs_atuante: Number(ubsId),
-        microarea: form.microarea.trim(),
       });
       setSuccess(true);
     } catch (err) {
       Alert.alert(
-        "Erro ao criar conta",
+        "Erro ao criar conta do Coordenador",
         err instanceof Error ? err.message : "Tente novamente.",
       );
     } finally {
@@ -445,25 +374,11 @@ export default function CreateAgentScreen() {
   }
 
   function resetForm() {
-    setForm({
-      nome: "",
-      cpf: "",
-      senha: "",
-      confirmarSenha: "",
-      microarea: "",
-    });
-    setTouched({
-      nome: false,
-      cpf: false,
-      senha: false,
-      confirmarSenha: false,
-      microarea: false,
-    });
+    setForm(EMPTY_FORM);
+    setTouched(NOT_TOUCHED);
     setErrors({});
     setSuccess(false);
   }
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.screen}>
@@ -479,8 +394,8 @@ export default function CreateAgentScreen() {
           <View style={styles.backArrow} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topbarSub}>Gerenciar equipe</Text>
-          <Text style={styles.topbarTitle}>Novo Agente</Text>
+          <Text style={styles.topbarSub}>Vigilância Regional</Text>
+          <Text style={styles.topbarTitle}>Nova Conta Coordenador</Text>
         </View>
       </View>
 
@@ -497,22 +412,18 @@ export default function CreateAgentScreen() {
         >
           {/* Info card */}
           <View style={styles.infoCard}>
-            <Text style={styles.infoEmoji}>ℹ️</Text>
+            <Text style={styles.infoEmoji}>🏛️</Text>
             <Text style={styles.infoText}>
-              A conta criada ficará vinculada à sua Unidade de Saúde. O agente
-              poderá fazer login imediatamente.
+              Cadastre um novo Coordenador Municipal. Ele poderá acessar o
+              painel municipal com as credenciais informadas.
             </Text>
           </View>
 
-          {/* Cargo */}
-          <Text style={styles.sectionLabel}>Tipo de agente</Text>
-          <CargoSelector value={cargo} onChange={setCargo} />
-
-          {/* Dados pessoais */}
-          <Text style={styles.sectionLabel}>Dados do profissional</Text>
+          {/* Dados do Coordenador */}
+          <Text style={styles.sectionLabel}>Informações do Coordenador</Text>
 
           <AnimatedField
-            label="Nome completo"
+            label="Nome do Coordenador"
             value={form.nome}
             placeholder=""
             onChangeText={(v) => handleChange("nome", v)}
@@ -524,28 +435,31 @@ export default function CreateAgentScreen() {
           />
 
           <AnimatedField
-            label="CPF"
+            label="CPF do Coordenador"
             value={form.cpf}
             placeholder=""
             onChangeText={(v) => handleChange("cpf", v)}
             onBlur={() => handleBlur("cpf")}
             error={touched.cpf ? errors.cpf : undefined}
-            keyboardType="default"
+            keyboardType="numeric"
             returnKeyType="next"
-            onSubmitEditing={() => senhaRef.current?.focus()}
+            onSubmitEditing={() => municipioRef.current?.focus()}
             inputRef={cpfRef}
           />
+
           <AnimatedField
-            label="Microárea"
-            value={form.microarea}
+            label="Município"
+            value={form.municipio}
             placeholder=""
-            onChangeText={(v) => handleChange("microarea", v)}
-            onBlur={() => handleBlur("microarea")}
-            error={touched.microarea ? errors.microarea : undefined}
+            onChangeText={(v) => handleChange("municipio", v)}
+            onBlur={() => handleBlur("municipio")}
+            error={touched.municipio ? errors.municipio : undefined}
             autoCapitalize="words"
             returnKeyType="next"
             onSubmitEditing={() => senhaRef.current?.focus()}
+            inputRef={municipioRef}
           />
+
           {/* Senha */}
           <Text style={styles.sectionLabel}>Acesso</Text>
 
@@ -576,28 +490,16 @@ export default function CreateAgentScreen() {
           />
 
           {/* Resumo do cadastro */}
-          {form.nome && form.cpf && (
+          {(form.nome || form.municipio) && (
             <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>Resumo do cadastro</Text>
+              <Text style={styles.previewLabel}>Resumo do Coordenador</Text>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Nome</Text>
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>CPF</Text>
-                <Text style={styles.previewVal} numberOfLines={1}>
-                  {form.cpf || "—"}
-                </Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>Microárea</Text>
-                <Text style={styles.previewVal}>{form.microarea || "—"}</Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>Cargo</Text>
-                <View style={styles.cargoPill}>
-                  <Text style={styles.cargoPillText}>{cargo}</Text>
-                </View>
+                <Text style={styles.previewKey}>Município</Text>
+                <Text style={styles.previewVal}>{form.municipio || "—"}</Text>
               </View>
             </View>
           )}
@@ -612,7 +514,9 @@ export default function CreateAgentScreen() {
             {loading ? (
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>Criar conta do agente</Text>
+              <Text style={styles.submitBtnText}>
+                Criar conta do Coordenador
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -628,6 +532,7 @@ export default function CreateAgentScreen() {
             resetForm();
             router.back();
           }}
+          onAnother={resetForm}
         />
       )}
     </View>
@@ -639,7 +544,6 @@ export default function CreateAgentScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
 
-  // Topbar
   topbar: {
     backgroundColor: Colors.teal600,
     paddingTop: 52,
@@ -680,7 +584,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: Spacing.lg },
 
-  // Info card
   infoCard: {
     flexDirection: "row",
     gap: Spacing.sm,
@@ -700,7 +603,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Section label
   sectionLabel: {
     fontSize: FontSize.xs,
     fontWeight: "700",
@@ -711,48 +613,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 
-  // Cargo selector
-  cargoContainer: {
-    flexDirection: "row",
-    backgroundColor: Colors.gray100,
-    borderRadius: Radius.sm,
-    padding: 4,
-    marginBottom: Spacing.lg,
-    height: 64,
-    position: "relative",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: Colors.gray100,
-  },
-  cargoSlider: {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.sm - 2,
-    shadowColor: Colors.gray900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cargoOption: {
-    flex: 1,
-    zIndex: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  cargoText: {
-    fontSize: FontSize.sm,
-    fontWeight: "600",
-    color: Colors.gray400,
-  },
-  cargoTextActive: { color: Colors.teal600, fontWeight: "700" },
-  cargoDesc: { fontSize: 10, color: Colors.gray200 },
-  cargoDescActive: { color: Colors.teal400 },
-
-  // Animated field
   fieldWrap: { marginBottom: Spacing.lg },
   fieldBox: {
     borderWidth: 1.5,
@@ -784,7 +644,6 @@ const styles = StyleSheet.create({
   eyeBtn: { padding: Spacing.sm },
   eyeIcon: { fontSize: 16 },
 
-  // Preview card
   previewCard: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
@@ -820,15 +679,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-  cargoPill: {
-    backgroundColor: Colors.teal50,
-    borderRadius: 20,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-  },
-  cargoPillText: { fontSize: 11, fontWeight: "700", color: Colors.teal800 },
 
-  // Submit button
   submitBtn: {
     backgroundColor: Colors.teal600,
     borderRadius: Radius.sm,
@@ -850,7 +701,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Success overlay
   successOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(4,52,44,0.55)",

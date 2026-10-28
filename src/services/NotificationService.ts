@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 import { Platform } from "react-native";
 const BASE_URL = "https://yara-project.onrender.com";
 //const BASE_URL = "http://localhost:8000";
@@ -85,16 +86,16 @@ export async function listarNotificacoes(): Promise<Notificacao[]> {
   if (!res.ok) throw new Error(data.detail ?? "Erro ao carregar notificações.");
 
   // O backend retorna { "Notificações": [...] }
-  return data["Notificações"] as Notificacao[];
+  return normalizarNotificacoes(data["Notificações"] as Notificacao[]);
 }
 
-export async function baixarRelatorioNotificacaoPDF(
+export async function baixarRelatorioNotificacaoXlsx(
   notificacaoId: number,
 ): Promise<Blob> {
   const headers = await authHeader();
 
   const res = await fetch(
-    `${BASE_URL}/agentes/notificacoes/${notificacaoId}/relatorio_pdf`,
+    `${BASE_URL}/agentes/notificacoes/${notificacaoId}/relatorio_xlsx`,
     {
       method: "GET",
       headers,
@@ -103,6 +104,29 @@ export async function baixarRelatorioNotificacaoPDF(
 
   if (!res.ok) {
     let mensagem = "Erro ao gerar relatório.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {}
+
+    throw new Error(mensagem);
+  }
+
+  return await res.blob();
+}
+
+// GET /agentes/exportar_relatorio/xlsx — todas as notificações do agente
+export async function exportarRelatorioAgenteXlsx(): Promise<Blob> {
+  const headers = await authHeader();
+
+  const res = await fetch(`${BASE_URL}/agentes/exportar_relatorio/xlsx`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!res.ok) {
+    let mensagem = "Erro ao gerar planilha.";
 
     try {
       const data = await res.json();

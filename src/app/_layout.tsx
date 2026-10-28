@@ -2,27 +2,37 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { router, Slot, useSegments } from "expo-router";
 
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import {
+  AuthProvider,
+  getHomeArea,
+  getHomeRoute,
+  PROTECTED_AREAS,
+  useAuth,
+} from "@/context/AuthContext";
 import { Colors } from "@/constants/theme";
 
 function RootLayoutNav() {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
+  const firstSegment = segments[0] as string | undefined;
 
   useEffect(() => {
     if (isLoading) return;
 
-    const firstSegment = segments[0];
-
     const isProtectedRoute =
-      firstSegment === "(agente)" ||
-      firstSegment === "(ubs)" ||
-      firstSegment === "(cm)";
+      !!firstSegment && PROTECTED_AREAS.includes(firstSegment);
 
-    if (!user && isProtectedRoute) {
-      router.replace("/");
+    // Deslogado tentando abrir uma área protegida → login
+    if (!user) {
+      if (isProtectedRoute) router.replace("/");
+      return;
     }
-  }, [user, isLoading, segments]);
+
+    // Logado na tela de login (ex.: após refresh) ou na área de outro perfil → home do perfil
+    if (!isProtectedRoute || firstSegment !== getHomeArea(user.role)) {
+      router.replace(getHomeRoute(user.role));
+    }
+  }, [user, isLoading, firstSegment]);
 
   if (isLoading) {
     return (

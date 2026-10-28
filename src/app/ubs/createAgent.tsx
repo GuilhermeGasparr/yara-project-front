@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,23 +19,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
-
-const BASE_URL = "https://yara-project.onrender.com";
 //const BASE_URL = "http://localhost:8000";
-
-async function criarVigilanteRegional(payload: {
+const BASE_URL = "https://yara-project.onrender.com";
+async function criarAgente(payload: {
   nome: string;
   cpf: string;
   senha: string;
-  superintendencia: number;
+  cargo: "ACS" | "ACE";
+  ubs_atuante: number;
+  microarea: string;
 }): Promise<void> {
   const token = await getItem("sentinela_token");
-  const res = await fetch(`${BASE_URL}/ve/criar_conta_vr`, {
+  const res = await fetch(`${BASE_URL}/ubs/criar_conta_acs_ace`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -41,8 +42,75 @@ async function criarVigilanteRegional(payload: {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok)
-    throw new Error(data.detail ?? "Erro ao criar conta da Vigilância Regional.");
+  if (!res.ok) throw new Error(data.detail ?? "Erro ao criar conta.");
+}
+
+// ─── Cargo selector animado ───────────────────────────────────────────────────
+
+type Cargo = "ACS" | "ACE";
+
+interface CargoSelectorProps {
+  value: Cargo;
+  onChange: (v: Cargo) => void;
+}
+
+function CargoSelector({ value, onChange }: CargoSelectorProps) {
+  const sliderX = useRef(new Animated.Value(0)).current;
+  const [width, setWidth] = useState(0);
+
+  function select(cargo: Cargo) {
+    const toValue = cargo === "ACE" ? width / 2 : 0;
+    Animated.spring(sliderX, {
+      toValue,
+      useNativeDriver: true,
+      bounciness: 5,
+      speed: 14,
+    }).start();
+    onChange(cargo);
+  }
+
+  return (
+    <View
+      style={styles.cargoContainer}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
+      {width > 0 && (
+        <Animated.View
+          style={[
+            styles.cargoSlider,
+            {
+              width: width / 2 - 4,
+              transform: [{ translateX: Animated.add(sliderX, 4) }],
+            },
+          ]}
+        />
+      )}
+      {(["ACS", "ACE"] as Cargo[]).map((cargo) => (
+        <Pressable
+          key={cargo}
+          style={styles.cargoOption}
+          onPress={() => select(cargo)}
+        >
+          <Text
+            style={[
+              styles.cargoText,
+              value === cargo && styles.cargoTextActive,
+            ]}
+          >
+            {cargo === "ACS" ? "🏥  ACS" : "🦟  ACE"}
+          </Text>
+          <Text
+            style={[
+              styles.cargoDesc,
+              value === cargo && styles.cargoDescActive,
+            ]}
+          >
+            {cargo === "ACS" ? "Agente Comunitário" : "Agente de Endemias"}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -55,7 +123,7 @@ interface AnimatedFieldProps {
   onChangeText: (v: string) => void;
   error?: string;
   secureTextEntry?: boolean;
-  keyboardType?: "default" | "numeric";
+  keyboardType?: "default";
   autoCapitalize?: "none" | "words";
   returnKeyType?: "next" | "done";
   onSubmitEditing?: () => void;
@@ -118,6 +186,7 @@ function AnimatedField({
       }).start();
     }
 
+    // avisa a tela que o campo perdeu o foco
     onBlurProp?.();
   }
 
@@ -145,6 +214,7 @@ function AnimatedField({
   return (
     <View style={styles.fieldWrap}>
       <Animated.View style={[styles.fieldBox, { borderColor }]}>
+        {/* Label flutuante */}
         <Animated.Text
           style={[
             styles.floatingLabel,
@@ -200,16 +270,14 @@ function AnimatedField({
 function SuccessOverlay({
   nome,
   onDone,
-  onAnother,
 }: {
   nome: string;
   onDone: () => void;
-  onAnother: () => void;
 }) {
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
+  useState(() => {
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
@@ -222,7 +290,7 @@ function SuccessOverlay({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [scale, opacity]);
+  });
 
   return (
     <Animated.View style={[styles.successOverlay, { opacity }]}>
@@ -230,9 +298,8 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          O(A) vigilante regional{" "}
-          <Text style={{ fontWeight: "700" }}>{nome}</Text> foi cadastrado(a)
-          com sucesso no sistema.
+          <Text style={{ fontWeight: "700" }}>{nome}</Text> já pode fazer login
+          no NorteAlerta.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}
@@ -243,12 +310,10 @@ function SuccessOverlay({
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.successBtnOutline}
-          onPress={onAnother}
+          onPress={() => {}}
           activeOpacity={0.8}
         >
-          <Text style={styles.successBtnOutlineText}>
-            Cadastrar outro Vigilante Regional
-          </Text>
+          <Text style={styles.successBtnOutlineText}>Criar outro agente</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -260,68 +325,65 @@ function SuccessOverlay({
 interface FormState {
   nome: string;
   cpf: string;
-  superintendencia: string;
   senha: string;
   confirmarSenha: string;
+  microarea: string;
 }
 
 interface FormErrors {
   nome?: string;
   cpf?: string;
-  superintendencia?: string;
   senha?: string;
   confirmarSenha?: string;
+  microarea?: string;
 }
 
-const EMPTY_FORM: FormState = {
-  nome: "",
-  cpf: "",
-  superintendencia: "",
-  senha: "",
-  confirmarSenha: "",
-};
+export default function CreateAgentScreen() {
+  const { user } = useAuth();
+  const ubsId = (user as any)?.ubs_atuante ?? (user as any)?.ubs ?? 0;
 
-const NOT_TOUCHED: Record<keyof FormState, boolean> = {
-  nome: false,
-  cpf: false,
-  superintendencia: false,
-  senha: false,
-  confirmarSenha: false,
-};
-
-export default function CreateVRScreen() {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [cargo, setCargo] = useState<Cargo>("ACS");
+  const [form, setForm] = useState<FormState>({
+    nome: "",
+    cpf: "",
+    senha: "",
+    confirmarSenha: "",
+    microarea: "",
+  });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] =
-    useState<Record<keyof FormState, boolean>>(NOT_TOUCHED);
+  const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({
+    nome: false,
+    cpf: false,
+    senha: false,
+    confirmarSenha: false,
+    microarea: false,
+  });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Refs para navegação
+  // Refs para navegação entre campos
   const cpfRef = useRef<TextInput>(null);
-  const superRef = useRef<TextInput>(null);
   const senhaRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
+  // ─── Validação ─────────────────────────────────────────────────────────────
+
   function validate(f: FormState): FormErrors {
     const e: FormErrors = {};
-
-    if (!f.nome.trim()) e.nome = "Nome do Vigilante obrigatório.";
+    if (!f.nome.trim()) e.nome = "Nome obrigatório.";
     else if (f.nome.trim().length < 3) e.nome = "Mínimo 3 caracteres.";
 
     if (!f.cpf.trim()) {
       e.cpf = "CPF obrigatório.";
     } else {
       const cpfNumeros = f.cpf.replace(/\D/g, "");
+
       if (cpfNumeros.length !== 11) {
         e.cpf = "O CPF deve possuir 11 dígitos.";
       }
     }
-
-    if (!f.superintendencia.trim()) {
-      e.superintendencia = "Superintendência obrigatória.";
-    } else if (!/^\d+$/.test(f.superintendencia.trim())) {
-      e.superintendencia = "Deve ser um número inteiro válido.";
+    if (!f.microarea.trim()) {
+      e.microarea = "Microárea obrigatória.";
     }
 
     if (!f.senha) e.senha = "Senha obrigatória.";
@@ -345,30 +407,35 @@ export default function CreateVRScreen() {
     setErrors(validate(form));
   }
 
+  // ─── Submit ────────────────────────────────────────────────────────────────
+
   async function handleSubmit() {
-    setTouched({
+    const allTouched = {
       nome: true,
       cpf: true,
-      superintendencia: true,
       senha: true,
       confirmarSenha: true,
-    });
+      microarea: true,
+    };
+    setTouched(allTouched);
     const errs = validate(form);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
     try {
-      await criarVigilanteRegional({
+      await criarAgente({
         nome: form.nome.trim(),
         cpf: form.cpf.replace(/\D/g, ""),
-        superintendencia: Number(form.superintendencia.trim()),
         senha: form.senha,
+        cargo,
+        ubs_atuante: Number(ubsId),
+        microarea: form.microarea.trim(),
       });
       setSuccess(true);
     } catch (err) {
       Alert.alert(
-        "Erro ao criar conta da Vigilância Regional",
+        "Erro ao criar conta",
         err instanceof Error ? err.message : "Tente novamente.",
       );
     } finally {
@@ -377,11 +444,25 @@ export default function CreateVRScreen() {
   }
 
   function resetForm() {
-    setForm(EMPTY_FORM);
-    setTouched(NOT_TOUCHED);
+    setForm({
+      nome: "",
+      cpf: "",
+      senha: "",
+      confirmarSenha: "",
+      microarea: "",
+    });
+    setTouched({
+      nome: false,
+      cpf: false,
+      senha: false,
+      confirmarSenha: false,
+      microarea: false,
+    });
     setErrors({});
     setSuccess(false);
   }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.screen}>
@@ -397,8 +478,8 @@ export default function CreateVRScreen() {
           <View style={styles.backArrow} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topbarSub}>Vigilância Estadual</Text>
-          <Text style={styles.topbarTitle}>Nova Conta Vigilância Regional</Text>
+          <Text style={styles.topbarSub}>Gerenciar equipe</Text>
+          <Text style={styles.topbarTitle}>Novo Agente</Text>
         </View>
       </View>
 
@@ -415,18 +496,22 @@ export default function CreateVRScreen() {
         >
           {/* Info card */}
           <View style={styles.infoCard}>
-            <Text style={styles.infoEmoji}>🗺️</Text>
+            <Text style={styles.infoEmoji}>ℹ️</Text>
             <Text style={styles.infoText}>
-              Cadastre um novo Vigilante Regional. Ele poderá acessar o painel
-              regional com as credenciais informadas.
+              A conta criada ficará vinculada à sua Unidade de Saúde. O agente
+              poderá fazer login imediatamente.
             </Text>
           </View>
 
-          {/* Dados do Vigilante */}
-          <Text style={styles.sectionLabel}>Informações do Vigilante</Text>
+          {/* Cargo */}
+          <Text style={styles.sectionLabel}>Tipo de agente</Text>
+          <CargoSelector value={cargo} onChange={setCargo} />
+
+          {/* Dados pessoais */}
+          <Text style={styles.sectionLabel}>Dados do profissional</Text>
 
           <AnimatedField
-            label="Nome do Vigilante Regional"
+            label="Nome completo"
             value={form.nome}
             placeholder=""
             onChangeText={(v) => handleChange("nome", v)}
@@ -438,31 +523,28 @@ export default function CreateVRScreen() {
           />
 
           <AnimatedField
-            label="CPF do Vigilante"
+            label="CPF"
             value={form.cpf}
             placeholder=""
             onChangeText={(v) => handleChange("cpf", v)}
             onBlur={() => handleBlur("cpf")}
             error={touched.cpf ? errors.cpf : undefined}
-            keyboardType="numeric"
-            returnKeyType="next"
-            onSubmitEditing={() => superRef.current?.focus()}
-            inputRef={cpfRef}
-          />
-
-          <AnimatedField
-            label="Superintendência (Número)"
-            value={form.superintendencia}
-            placeholder=""
-            onChangeText={(v) => handleChange("superintendencia", v)}
-            onBlur={() => handleBlur("superintendencia")}
-            error={touched.superintendencia ? errors.superintendencia : undefined}
-            keyboardType="numeric"
+            keyboardType="default"
             returnKeyType="next"
             onSubmitEditing={() => senhaRef.current?.focus()}
-            inputRef={superRef}
+            inputRef={cpfRef}
           />
-
+          <AnimatedField
+            label="Microárea"
+            value={form.microarea}
+            placeholder=""
+            onChangeText={(v) => handleChange("microarea", v)}
+            onBlur={() => handleBlur("microarea")}
+            error={touched.microarea ? errors.microarea : undefined}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => senhaRef.current?.focus()}
+          />
           {/* Senha */}
           <Text style={styles.sectionLabel}>Acesso</Text>
 
@@ -493,18 +575,28 @@ export default function CreateVRScreen() {
           />
 
           {/* Resumo do cadastro */}
-          {(form.nome || form.superintendencia) && (
+          {form.nome && form.cpf && (
             <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>Resumo do Vigilante</Text>
+              <Text style={styles.previewLabel}>Resumo do cadastro</Text>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Nome</Text>
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>Superintendência</Text>
-                <Text style={styles.previewVal}>
-                  {form.superintendencia || "—"}
+                <Text style={styles.previewKey}>CPF</Text>
+                <Text style={styles.previewVal} numberOfLines={1}>
+                  {form.cpf || "—"}
                 </Text>
+              </View>
+              <View style={styles.previewRow}>
+                <Text style={styles.previewKey}>Microárea</Text>
+                <Text style={styles.previewVal}>{form.microarea || "—"}</Text>
+              </View>
+              <View style={styles.previewRow}>
+                <Text style={styles.previewKey}>Cargo</Text>
+                <View style={styles.cargoPill}>
+                  <Text style={styles.cargoPillText}>{cargo}</Text>
+                </View>
               </View>
             </View>
           )}
@@ -519,9 +611,7 @@ export default function CreateVRScreen() {
             {loading ? (
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>
-                Criar conta da Vigilância Regional
-              </Text>
+              <Text style={styles.submitBtnText}>Criar conta do agente</Text>
             )}
           </TouchableOpacity>
 
@@ -537,7 +627,6 @@ export default function CreateVRScreen() {
             resetForm();
             router.back();
           }}
-          onAnother={resetForm}
         />
       )}
     </View>
@@ -549,6 +638,7 @@ export default function CreateVRScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg },
 
+  // Topbar
   topbar: {
     backgroundColor: Colors.teal600,
     paddingTop: 52,
@@ -589,6 +679,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: Spacing.lg },
 
+  // Info card
   infoCard: {
     flexDirection: "row",
     gap: Spacing.sm,
@@ -608,6 +699,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // Section label
   sectionLabel: {
     fontSize: FontSize.xs,
     fontWeight: "700",
@@ -618,6 +710,48 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 
+  // Cargo selector
+  cargoContainer: {
+    flexDirection: "row",
+    backgroundColor: Colors.gray100,
+    borderRadius: Radius.sm,
+    padding: 4,
+    marginBottom: Spacing.lg,
+    height: 64,
+    position: "relative",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: Colors.gray100,
+  },
+  cargoSlider: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.sm - 2,
+    shadowColor: Colors.gray900,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cargoOption: {
+    flex: 1,
+    zIndex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  cargoText: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    color: Colors.gray400,
+  },
+  cargoTextActive: { color: Colors.teal600, fontWeight: "700" },
+  cargoDesc: { fontSize: 10, color: Colors.gray200 },
+  cargoDescActive: { color: Colors.teal400 },
+
+  // Animated field
   fieldWrap: { marginBottom: Spacing.lg },
   fieldBox: {
     borderWidth: 1.5,
@@ -649,6 +783,7 @@ const styles = StyleSheet.create({
   eyeBtn: { padding: Spacing.sm },
   eyeIcon: { fontSize: 16 },
 
+  // Preview card
   previewCard: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
@@ -684,7 +819,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
+  cargoPill: {
+    backgroundColor: Colors.teal50,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  cargoPillText: { fontSize: 11, fontWeight: "700", color: Colors.teal800 },
 
+  // Submit button
   submitBtn: {
     backgroundColor: Colors.teal600,
     borderRadius: Radius.sm,
@@ -706,6 +849,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
+  // Success overlay
   successOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(4,52,44,0.55)",

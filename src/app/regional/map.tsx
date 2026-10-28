@@ -1,11 +1,11 @@
-import WebMap from "@/app/(agente)/WebMap";
-import { listarNotificacoesCM, NotificacaoCM } from "@/services/CmService";
-import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import WebMap from "@/app/agente/WebMap";
+import { listarNotificacoesRegionais } from "@/services/RegionalService";
+import type { Notificacao } from "@/services/NotificationService";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -24,22 +24,18 @@ const COLORS = {
   cardBg: "#FFFFFF",
   textDark: "#2D3748",
   textGray: "#718096",
+  chipSelected: "#0D6847",
 };
 
 const CATEGORIAS_FILTRO = ["Todos", "Doença", "Epizootia", "Desastre"];
 
-// Campos adicionais que o mapa pode receber caso estejam presentes
-// na resposta da API, mesmo não estando declarados no tipo NotificacaoCM.
-type NotificacaoNoMapa = NotificacaoCM & {
-  latitude?: number | null;
-  longitude?: number | null;
-  endereco?: string | null;
-};
+export default function VrMapScreen() {
+  const router = useRouter();
 
-export default function CMMapScreen() {
   const [filter, setFilter] = useState("Todos");
   const [loading, setLoading] = useState(true);
-  const [notificacoes, setNotificacoes] = useState<NotificacaoCM[]>([]);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [erro, setErro] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("Todos os meses");
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
   const [region, setRegion] = useState({
@@ -56,123 +52,57 @@ export default function CMMapScreen() {
   async function fetchNotificacoes() {
     try {
       setLoading(true);
+      setErro("");
 
-      // Usa o serviço autenticado da Coordenação Municipal.
-      const lista = await listarNotificacoesCM();
+      // O backend retorna somente notificações da superintendência
+      // vinculada ao usuário VR autenticado.
+      const lista = await listarNotificacoesRegionais();
+
       setNotificacoes(lista);
 
-      const primeiraComCoords = (lista as NotificacaoNoMapa[]).find(
-        (item) =>
-          item.latitude != null &&
-          item.longitude != null &&
-          Number.isFinite(Number(item.latitude)) &&
-          Number.isFinite(Number(item.longitude)),
+      const primeiraComCoords = lista.find(
+        (item) => item.latitude != null && item.longitude != null,
       );
 
       if (primeiraComCoords) {
         setRegion({
-          latitude: Number(primeiraComCoords.latitude),
-          longitude: Number(primeiraComCoords.longitude),
+          latitude: primeiraComCoords.latitude!,
+          longitude: primeiraComCoords.longitude!,
           latitudeDelta: 0.03,
           longitudeDelta: 0.03,
         });
       }
     } catch (error) {
-      Alert.alert(
-        "Erro",
+      console.error("Erro ao buscar notificações do mapa regional:", error);
+
+      setErro(
         error instanceof Error
           ? error.message
-          : "Não foi possível carregar as notificações do município.",
+          : "Não foi possível carregar as notificações regionais.",
       );
     } finally {
       setLoading(false);
     }
   }
 
-  function getMarkerColor(categoria?: string, tipoEvento?: string) {
-    const texto = `${categoria ?? ""} ${tipoEvento ?? ""}`
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toUpperCase();
+  function getMarkerColor(categoria?: string | null) {
+    const catUpper = categoria?.toUpperCase() || "";
 
-    if (texto.includes("EPIZOOTIA") || texto.includes("MORTE DE ANIMAIS")) {
+    if (catUpper.includes("DOENÇA") || catUpper.includes("DOENCA")) {
+      return COLORS.doenca;
+    }
+
+    if (catUpper.includes("EPIZOOTIA")) {
       return COLORS.epizootia;
     }
 
-    if (texto.includes("DESASTRE")) {
+    if (catUpper.includes("DESASTRE")) {
       return COLORS.desastre;
-    }
-
-    if (texto.includes("DOENCA") || texto.includes("GRIPE")) {
-      return COLORS.doenca;
     }
 
     return COLORS.doenca;
   }
 
-  const notificacoesFiltradas = notificacoes.filter((item) => {
-    const categoria = item.categoria?.toUpperCase() || "";
-
-    const correspondeCategoria =
-      filter === "Todos" ||
-      categoria.includes(filter.toUpperCase()) ||
-      (filter === "Doença" && categoria.includes("DOENCA"));
-
-    const date = item.data_envio ? new Date(item.data_envio) : null;
-
-    const mesNotificacao =
-      date && !Number.isNaN(date.getTime())
-        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-            2,
-            "0",
-          )}`
-        : "";
-
-    const correspondeMes =
-      selectedMonth === "Todos os meses" || mesNotificacao === selectedMonth;
-
-    return correspondeCategoria && correspondeMes;
-  });
-
-  function formatDate(dateStr: string) {
-    if (!dateStr) return "";
-
-    const date = new Date(dateStr);
-
-    if (Number.isNaN(date.getTime())) return "";
-
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  }
-
-  function getStatusColor(status: string) {
-    switch (status) {
-      case "EM ANDAMENTO":
-        return "#1261A0";
-      case "EM INVESTIGAÇÃO":
-        return "#854F0B";
-      case "VERÍDICO":
-        return "#0D6847";
-      case "NÃO VERÍDICO":
-        return "#C62828";
-      case "ENCERRADO":
-        return "#718096";
-      default:
-        return COLORS.textGray;
-    }
-  }
-
-  const notificacoesParaMapa = (
-    notificacoesFiltradas as NotificacaoNoMapa[]
-  ).map((item) => ({
-    ...item,
-    endereco: item.endereco ?? undefined,
-    latitude: item.latitude != null ? Number(item.latitude) : undefined,
-    longitude: item.longitude != null ? Number(item.longitude) : undefined,
-  }));
   const mesesDisponiveis = Array.from(
     new Set(
       notificacoes
@@ -180,7 +110,9 @@ export default function CMMapScreen() {
         .map((item) => {
           const date = new Date(item.data_envio);
 
-          if (Number.isNaN(date.getTime())) return null;
+          if (Number.isNaN(date.getTime())) {
+            return null;
+          }
 
           return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
             2,
@@ -201,6 +133,41 @@ export default function CMMapScreen() {
 
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
+
+  const filteredNotificacoes = notificacoes.filter((item) => {
+    const categoria = item.categoria?.toUpperCase() || "";
+
+    const correspondeCategoria =
+      filter === "Todos" ||
+      categoria.includes(filter.toUpperCase()) ||
+      (filter === "Doença" && categoria.includes("DOENCA"));
+
+    const date = new Date(item.data_envio);
+
+    const mesNotificacao = Number.isNaN(date.getTime())
+      ? ""
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    const correspondeMes =
+      selectedMonth === "Todos os meses" || mesNotificacao === selectedMonth;
+
+    return correspondeCategoria && correspondeMes;
+  });
+
+  function formatDate(dateStr?: string | null) {
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -213,26 +180,12 @@ export default function CMMapScreen() {
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
-            activeOpacity={0.8}
+            accessibilityLabel="Voltar"
           >
-            <Feather name="arrow-left" size={20} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={20} color="#FFF" />
           </TouchableOpacity>
 
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Mapa do Município</Text>
-            <Text style={styles.headerSubtitle}>
-              Ocorrências da coordenação municipal
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => fetchNotificacoes()}
-            style={styles.refreshButton}
-            activeOpacity={0.8}
-            disabled={loading}
-          >
-            <Feather name="refresh-cw" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Mapa Regional</Text>
         </View>
       </SafeAreaView>
 
@@ -240,43 +193,46 @@ export default function CMMapScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Filtro por categoria */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.filterScrollView}
           contentContainerStyle={styles.filterContainer}
         >
-          {CATEGORIAS_FILTRO.map((categoria) => {
-            const selecionado = filter === categoria;
+          {CATEGORIAS_FILTRO.map((cat) => {
+            const isSelected = filter === cat;
 
             return (
               <TouchableOpacity
-                key={categoria}
-                style={[styles.chip, selecionado && styles.chipActive]}
-                onPress={() => setFilter(categoria)}
-                activeOpacity={0.8}
+                key={cat}
+                style={[styles.chip, isSelected && styles.chipActive]}
+                onPress={() => setFilter(cat)}
               >
                 <Text
-                  style={[
-                    styles.chipText,
-                    selecionado && styles.chipTextActive,
-                  ]}
+                  style={[styles.chipText, isSelected && styles.chipTextActive]}
                 >
-                  {categoria}
+                  {cat}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {/* FILTRO POR MÊS */}
+        {/* Filtro por mês */}
+
+        {/* Filtro por mês — lista suspensa */}
         <View style={styles.monthFilterContainer}>
           <TouchableOpacity
             style={styles.monthDropdownButton}
             onPress={() => setMonthDropdownOpen((prev) => !prev)}
             activeOpacity={0.7}
           >
-            <Feather name="calendar" size={18} color={COLORS.primaryHeader} />
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={COLORS.primaryHeader}
+            />
 
             <Text style={styles.monthDropdownText}>
               {selectedMonth === "Todos os meses"
@@ -284,7 +240,7 @@ export default function CMMapScreen() {
                 : formatMonthLabel(selectedMonth)}
             </Text>
 
-            <Feather
+            <Ionicons
               name={monthDropdownOpen ? "chevron-up" : "chevron-down"}
               size={18}
               color={COLORS.textGray}
@@ -294,14 +250,14 @@ export default function CMMapScreen() {
           {monthDropdownOpen && (
             <View style={styles.monthDropdownOptions}>
               {["Todos os meses", ...mesesDisponiveis].map((mes) => {
-                const selecionado = selectedMonth === mes;
+                const isSelected = selectedMonth === mes;
 
                 return (
                   <TouchableOpacity
                     key={mes}
                     style={[
                       styles.monthOption,
-                      selecionado && styles.monthOptionSelected,
+                      isSelected && styles.monthOptionSelected,
                     ]}
                     onPress={() => {
                       setSelectedMonth(mes);
@@ -311,15 +267,15 @@ export default function CMMapScreen() {
                     <Text
                       style={[
                         styles.monthOptionText,
-                        selecionado && styles.monthOptionTextSelected,
+                        isSelected && styles.monthOptionTextSelected,
                       ]}
                     >
                       {mes === "Todos os meses" ? mes : formatMonthLabel(mes)}
                     </Text>
 
-                    {selecionado && (
-                      <Feather
-                        name="check"
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
                         size={18}
                         color={COLORS.primaryHeader}
                       />
@@ -331,67 +287,82 @@ export default function CMMapScreen() {
           )}
         </View>
 
+        {/* Mapa */}
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
             <WebMap
               region={region}
-              notificacoes={notificacoesParaMapa}
-              getMarkerColor={(categoria: string) => {
-                const cat = categoria?.toUpperCase() ?? "";
-
-                if (cat.includes("DOENÇA") || cat.includes("DOENCA")) {
-                  return COLORS.doenca;
-                }
-
-                if (cat.includes("EPIZOOTIA")) {
-                  return COLORS.epizootia;
-                }
-
-                if (cat.includes("DESASTRE")) {
-                  return COLORS.desastre;
-                }
-
-                return COLORS.doenca;
-              }}
+              notificacoes={filteredNotificacoes.map((n) => ({
+                ...n,
+                endereco: n.endereco ?? undefined,
+                latitude: n.latitude ?? undefined,
+                longitude: n.longitude ?? undefined,
+              }))}
+              getMarkerColor={getMarkerColor}
             />
           </View>
 
           <View style={styles.legendContainer}>
-            {[
-              { label: "Doença", color: COLORS.doenca },
-              { label: "Epizootia", color: COLORS.epizootia },
-              { label: "Desastre", color: COLORS.desastre },
-            ].map((item) => (
-              <View key={item.label} style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, { backgroundColor: item.color }]}
-                />
-                <Text style={styles.legendText}>{item.label}</Text>
-              </View>
-            ))}
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendDot, { backgroundColor: COLORS.doenca }]}
+              />
+              <Text style={styles.legendText}>Doença</Text>
+            </View>
+
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendDot,
+                  { backgroundColor: COLORS.epizootia },
+                ]}
+              />
+              <Text style={styles.legendText}>Epizootia</Text>
+            </View>
+
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendDot, { backgroundColor: COLORS.desastre }]}
+              />
+              <Text style={styles.legendText}>Desastre</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>OCORRÊNCIAS DO MUNICÍPIO</Text>
-          <Text style={styles.countText}>{notificacoesFiltradas.length}</Text>
+          <Text style={styles.sectionTitle}>
+            OCORRÊNCIAS NA SUPERINTENDÊNCIA
+          </Text>
+
+          <Text style={styles.countText}>{filteredNotificacoes.length}</Text>
         </View>
 
         <View style={styles.listCard}>
           {loading ? (
             <ActivityIndicator
-              size="large"
+              size="small"
               color={COLORS.primaryHeader}
-              style={{ padding: 24 }}
+              style={{ padding: 20 }}
             />
-          ) : notificacoesFiltradas.length === 0 ? (
+          ) : erro ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{erro}</Text>
+
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={fetchNotificacoes}
+              >
+                <Text style={styles.retryText}>Tentar novamente</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredNotificacoes.length === 0 ? (
             <Text style={styles.emptyText}>
-              Nenhuma ocorrência encontrada para este filtro.
+              Nenhuma ocorrência encontrada para os filtros selecionados.
             </Text>
           ) : (
-            notificacoesFiltradas.map((item, index) => {
-              const color = getMarkerColor(item.categoria, item.tipo_evento);
-              const isLast = index === notificacoesFiltradas.length - 1;
+            filteredNotificacoes.map((item, index) => {
+              const color = getMarkerColor(item.categoria);
+              const isLast = index === filteredNotificacoes.length - 1;
 
               return (
                 <View
@@ -402,47 +373,31 @@ export default function CMMapScreen() {
 
                   <View style={styles.listInfo}>
                     <Text style={styles.itemTitle}>
-                      {item.tipo_evento || item.categoria}
+                      {item.tipo_evento || item.categoria || "Ocorrência"}
+                      {" — "}
+                      {item.endereco ||
+                        item.local_ocorrencia ||
+                        "Local não informado"}
                     </Text>
 
                     <Text style={styles.itemSubtitle}>
-                      {item.local_ocorrencia || "Local não informado"}
+                      {formatDate(item.data_envio)}
+                      {" · "}
+                      {item.municipio || "Município não informado"}
+                      {" · "}
+                      {item.pessoas_animais_infectados_afetados ?? 0}
+                      {" afetados"}
                     </Text>
 
-                    <Text style={styles.itemSubtitle}>
-                      {formatDate(item.data_envio)} ·{" "}
-                      {item.pessoas_animais_infectados_afetados} afetados
-                    </Text>
-
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor: getStatusColor(item.status) + "18",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          { color: getStatusColor(item.status) },
-                        ]}
-                      >
-                        {item.status}
-                      </Text>
-                    </View>
+                    {!!item.coads && (
+                      <Text style={styles.coadsText}>COADS: {item.coads}</Text>
+                    )}
                   </View>
-
-                  <Text style={styles.idText}>
-                    #{String(item.id).padStart(4, "0")}
-                  </Text>
                 </View>
               );
             })
           )}
         </View>
-
-        <View style={{ height: 30 }} />
       </ScrollView>
     </View>
   );
@@ -461,7 +416,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    gap: 12,
   },
   backButton: {
     width: 36,
@@ -470,39 +424,47 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#FFFFFF",
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
-    marginTop: 3,
-  },
   scrollContent: {
     paddingBottom: 30,
   },
   filterScrollView: {
-    marginVertical: 12,
+    marginVertical: 8,
   },
   filterContainer: {
     paddingHorizontal: 16,
     gap: 8,
   },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  chipActive: {
+    backgroundColor: COLORS.chipSelected,
+    borderColor: COLORS.chipSelected,
+  },
+  chipText: {
+    fontSize: 14,
+    color: COLORS.textDark,
+    fontWeight: "500",
+  },
+  chipTextActive: {
+    color: "#FFFFFF",
+  },
 
   monthFilterContainer: {
     marginHorizontal: 16,
-    marginTop: 0,
+    marginTop: 4,
     marginBottom: 12,
     zIndex: 10,
   },
@@ -563,26 +525,7 @@ const styles = StyleSheet.create({
     color: COLORS.primaryHeader,
     fontWeight: "600",
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  chipActive: {
-    backgroundColor: COLORS.primaryHeader,
-    borderColor: COLORS.primaryHeader,
-  },
-  chipText: {
-    fontSize: 14,
-    color: COLORS.textDark,
-    fontWeight: "500",
-  },
-  chipTextActive: {
-    color: "#FFFFFF",
-  },
+
   mapCard: {
     marginHorizontal: 16,
     backgroundColor: COLORS.cardBg,
@@ -596,14 +539,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   mapContainer: {
-    height: 260,
+    height: 220,
     width: "100%",
+    position: "relative",
   },
   legendContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    flexWrap: "wrap",
-    gap: 10,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: "#EDF2F7",
@@ -619,7 +561,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   legendText: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.textDark,
     fontWeight: "500",
   },
@@ -650,9 +592,8 @@ const styles = StyleSheet.create({
   },
   listItem: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     paddingVertical: 14,
-    gap: 10,
   },
   listItemBorder: {
     borderBottomWidth: 1,
@@ -662,7 +603,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginTop: 5,
+    marginRight: 12,
   },
   listInfo: {
     flex: 1,
@@ -671,31 +612,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: COLORS.textDark,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   itemSubtitle: {
     fontSize: 12,
     color: COLORS.textGray,
-    marginBottom: 3,
   },
-  statusBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 5,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  idText: {
-    fontSize: 11,
-    color: COLORS.textGray,
+  coadsText: {
+    fontSize: 12,
+    color: COLORS.primaryHeader,
+    marginTop: 4,
+    fontWeight: "500",
   },
   emptyText: {
     textAlign: "center",
-    padding: 24,
+    padding: 20,
     color: COLORS.textGray,
+  },
+  errorContainer: {
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    color: COLORS.textDark,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: COLORS.primaryHeader,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

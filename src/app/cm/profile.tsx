@@ -42,6 +42,15 @@ export default function ProfileScreen() {
 
   const cm = user as CMUser;
 
+  // Sem histórico (ex.: refresh direto em /cm/profile) volta para a home do CM
+  function handleBack() {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/cm");
+    }
+  }
+
   async function doLogout() {
     await signOut();
 
@@ -82,6 +91,13 @@ export default function ProfileScreen() {
     <View style={styles.screen}>
       <View style={styles.hero}>
         <View style={styles.topbar}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.backBtn}
+            hitSlop={12}
+          >
+            <View style={styles.backArrow} />
+          </TouchableOpacity>
           <Text style={styles.topbarTitle}>Perfil</Text>
         </View>
 
@@ -168,6 +184,27 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  backArrow: {
+    width: 9,
+    height: 9,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: Colors.white,
+    transform: [{ rotate: "45deg" }, { translateX: 2 }],
   },
 
   topbarTitle: {

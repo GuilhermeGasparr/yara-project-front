@@ -1,4 +1,4 @@
-import { LoginPayload, LoginResponse, AuthUser } from "@/types";
+import { AuthUser, LoginPayload, LoginResponse } from "@/types";
 
 const BASE_URL = "https://yara-project.onrender.com";
 //const BASE_URL = "http://localhost:8000";
@@ -84,13 +84,13 @@ export function buildUserFromToken(
   }
 
   if (tipo === "VE") {
-  return {
-    role: "ve",
-    id,
-    nome: (extras?.["nome"] as string) ?? "",
-    cpf: (extras?.["cpf"] as string) ?? "",
-  };
-}
+    return {
+      role: "ve",
+      id,
+      nome: (extras?.["nome"] as string) ?? "",
+      cpf: (extras?.["cpf"] as string) ?? "",
+    };
+  }
   throw new Error(`Tipo de usuário desconhecido: ${tipo}`);
 }
 

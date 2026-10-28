@@ -1,11 +1,8 @@
-import WebMap from "@/app/(agente)/WebMap";
+import WebMap from "@/app/agente/WebMap";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  listarNotificacoes,
-  Notificacao,
-} from "@/services/NotificationService";
+import { listarNotificacoesUBS, NotificacaoUBS } from "@/services/UbsService";
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -16,12 +13,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// Cores base do projeto
+
 const COLORS = {
-  primaryHeader: "#0D6847", // Verde do topo
-  doenca: "#D9534F", // Vermelho / Rosa
-  epizootia: "#C07D2B", // Laranja / Castanho
-  desastre: "#337AB7", // Azul
+  primaryHeader: "#0D6847",
+  doenca: "#D9534F",
+  epizootia: "#C07D2B",
+  desastre: "#337AB7",
   background: "#F5F7F6",
   cardBg: "#FFFFFF",
   textDark: "#2D3748",
@@ -31,14 +28,14 @@ const COLORS = {
 
 const CATEGORIAS_FILTRO = ["Todos", "Doença", "Epizootia", "Desastre"];
 
-export default function MapScreen() {
+export default function UbsMapScreen() {
   const router = useRouter();
+
   const [filter, setFilter] = useState("Todos");
   const [loading, setLoading] = useState(true);
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [monthDropdownVisible, setMonthDropdownVisible] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
   const [selectedMonth, setSelectedMonth] = useState("Todos os meses");
-  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
-  // Região inicial do mapa
   const [region, setRegion] = useState({
     latitude: -3.7319,
     longitude: -38.5267,
@@ -50,78 +47,49 @@ export default function MapScreen() {
     fetchNotificacoes();
   }, []);
 
-  const fetchNotificacoes = async () => {
+  async function fetchNotificacoes() {
     try {
       setLoading(true);
 
-      const lista = await listarNotificacoes();
-
+      const lista = await listarNotificacoesUBS();
       setNotificacoes(lista);
-      console.log("NOTIFICAÇÕES DO MAPA:", lista);
+
       const primeiraComCoords = lista.find(
-        (item) =>
-          item.latitude !== null &&
-          item.latitude !== undefined &&
-          item.longitude !== null &&
-          item.longitude !== undefined,
+        (item) => item.latitude != null && item.longitude != null,
       );
 
-      if (
-        primeiraComCoords?.latitude !== undefined &&
-        primeiraComCoords?.longitude !== undefined
-      ) {
+      if (primeiraComCoords) {
         setRegion({
-          latitude: primeiraComCoords.latitude,
-          longitude: primeiraComCoords.longitude,
+          latitude: primeiraComCoords.latitude!,
+          longitude: primeiraComCoords.longitude!,
           latitudeDelta: 0.03,
           longitudeDelta: 0.03,
         });
       }
     } catch (error) {
-      console.error("Erro ao buscar notificações do mapa:", error);
+      console.error("Erro ao buscar notificações do mapa da UBS:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const getMarkerColor = (categoria: string) => {
+  function getMarkerColor(categoria: string) {
     const catUpper = categoria?.toUpperCase() || "";
-    if (catUpper.includes("DOENÇA") || catUpper.includes("DOENCA"))
+
+    if (catUpper.includes("DOENÇA") || catUpper.includes("DOENCA")) {
       return COLORS.doenca;
-    if (catUpper.includes("EPIZOOTIA")) return COLORS.epizootia;
-    if (catUpper.includes("DESASTRE")) return COLORS.desastre;
+    }
+
+    if (catUpper.includes("EPIZOOTIA")) {
+      return COLORS.epizootia;
+    }
+
+    if (catUpper.includes("DESASTRE")) {
+      return COLORS.desastre;
+    }
+
     return COLORS.doenca;
-  };
-
-  const filteredNotificacoes = notificacoes.filter((item) => {
-    const categoria = item.categoria?.toUpperCase() || "";
-
-    const correspondeCategoria =
-      filter === "Todos" ||
-      categoria.includes(filter.toUpperCase()) ||
-      (filter === "Doença" && categoria.includes("DOENCA"));
-
-    const date = item.data_envio ? new Date(item.data_envio) : null;
-
-    const mesNotificacao =
-      date && !Number.isNaN(date.getTime())
-        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-        : "";
-
-    const correspondeMes =
-      selectedMonth === "Todos os meses" || mesNotificacao === selectedMonth;
-
-    return correspondeCategoria && correspondeMes;
-  });
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-    });
-  };
+  }
   const mesesDisponiveis = Array.from(
     new Set(
       notificacoes
@@ -131,13 +99,16 @@ export default function MapScreen() {
 
           if (Number.isNaN(date.getTime())) return null;
 
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+            2,
+            "0",
+          )}`;
         })
         .filter((mes): mes is string => mes !== null),
     ),
   ).sort((a, b) => b.localeCompare(a));
 
-  const formatMonthLabel = (monthKey: string) => {
+  function formatMonthLabel(monthKey: string) {
     const [year, month] = monthKey.split("-").map(Number);
 
     const label = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {
@@ -146,7 +117,35 @@ export default function MapScreen() {
     });
 
     return label.charAt(0).toUpperCase() + label.slice(1);
-  };
+  }
+  const filteredNotificacoes = notificacoes.filter((item) => {
+    const correspondeCategoria =
+      filter === "Todos" ||
+      item.categoria?.toUpperCase().includes(filter.toUpperCase());
+
+    const date = new Date(item.data_envio);
+
+    const mesNotificacao = Number.isNaN(date.getTime())
+      ? ""
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    const correspondeMes =
+      selectedMonth === "Todos os meses" || mesNotificacao === selectedMonth;
+
+    return correspondeCategoria && correspondeMes;
+  });
+
+  function formatDate(dateStr: string) {
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -154,7 +153,6 @@ export default function MapScreen() {
         backgroundColor={COLORS.primaryHeader}
       />
 
-      {/* Header Superior */}
       <SafeAreaView style={styles.headerContainer}>
         <View style={styles.headerContent}>
           <TouchableOpacity
@@ -163,6 +161,7 @@ export default function MapScreen() {
           >
             <Ionicons name="arrow-back" size={20} color="#FFF" />
           </TouchableOpacity>
+
           <Text style={styles.headerTitle}>Mapa do Território</Text>
         </View>
       </SafeAreaView>
@@ -171,7 +170,6 @@ export default function MapScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Filtros em Chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -180,6 +178,7 @@ export default function MapScreen() {
         >
           {CATEGORIAS_FILTRO.map((cat) => {
             const isSelected = filter === cat;
+
             return (
               <TouchableOpacity
                 key={cat}
@@ -195,60 +194,58 @@ export default function MapScreen() {
             );
           })}
         </ScrollView>
-        {/* FILTRO POR MÊS */}
         <View style={styles.monthFilterContainer}>
           <TouchableOpacity
-            style={styles.monthDropdownButton}
-            onPress={() => setMonthDropdownOpen((prev) => !prev)}
+            style={styles.monthFilterButton}
+            onPress={() => setMonthDropdownVisible(!monthDropdownVisible)}
             activeOpacity={0.7}
           >
             <Ionicons
               name="calendar-outline"
-              size={18}
+              size={17}
               color={COLORS.primaryHeader}
             />
 
-            <Text style={styles.monthDropdownText}>
+            <Text style={styles.monthFilterText}>
               {selectedMonth === "Todos os meses"
                 ? "Todos os meses"
                 : formatMonthLabel(selectedMonth)}
             </Text>
 
             <Ionicons
-              name={monthDropdownOpen ? "chevron-up" : "chevron-down"}
-              size={18}
+              name={monthDropdownVisible ? "chevron-up" : "chevron-down"}
+              size={16}
               color={COLORS.textGray}
             />
           </TouchableOpacity>
 
-          {monthDropdownOpen && (
-            <View style={styles.monthDropdownOptions}>
+          {monthDropdownVisible && (
+            <View style={styles.monthDropdown}>
               {["Todos os meses", ...mesesDisponiveis].map((mes) => {
-                const selecionado = selectedMonth === mes;
+                const isSelected = selectedMonth === mes;
 
                 return (
                   <TouchableOpacity
                     key={mes}
                     style={[
                       styles.monthOption,
-                      selecionado && styles.monthOptionSelected,
+                      isSelected && styles.monthOptionSelected,
                     ]}
                     onPress={() => {
                       setSelectedMonth(mes);
-                      setMonthDropdownOpen(false);
+                      setMonthDropdownVisible(false);
                     }}
-                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.monthOptionText,
-                        selecionado && styles.monthOptionTextSelected,
+                        isSelected && styles.monthOptionTextSelected,
                       ]}
                     >
                       {mes === "Todos os meses" ? mes : formatMonthLabel(mes)}
                     </Text>
 
-                    {selecionado && (
+                    {isSelected && (
                       <Ionicons
                         name="checkmark"
                         size={18}
@@ -261,17 +258,19 @@ export default function MapScreen() {
             </View>
           )}
         </View>
-        {/* Card do Mapa */}
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
             <WebMap
               region={region}
-              notificacoes={filteredNotificacoes}
-              getMarkerColor={getMarkerColor}
+              notificacoes={filteredNotificacoes.map((n) => ({
+                ...n,
+                endereco: n.endereco ?? undefined,
+                latitude: n.latitude ?? undefined,
+                longitude: n.longitude ?? undefined,
+              }))}
             />
           </View>
 
-          {/* Legenda do Mapa */}
           <View style={styles.legendContainer}>
             <View style={styles.legendItem}>
               <View
@@ -279,6 +278,7 @@ export default function MapScreen() {
               />
               <Text style={styles.legendText}>Doença</Text>
             </View>
+
             <View style={styles.legendItem}>
               <View
                 style={[
@@ -288,6 +288,7 @@ export default function MapScreen() {
               />
               <Text style={styles.legendText}>Epizootia</Text>
             </View>
+
             <View style={styles.legendItem}>
               <View
                 style={[styles.legendDot, { backgroundColor: COLORS.desastre }]}
@@ -297,10 +298,8 @@ export default function MapScreen() {
           </View>
         </View>
 
-        {/* Título da Lista */}
         <Text style={styles.sectionTitle}>OCORRÊNCIAS NO MAPA</Text>
 
-        {/* Card com a Lista de Ocorrências */}
         <View style={styles.listCard}>
           {loading ? (
             <ActivityIndicator
@@ -321,6 +320,7 @@ export default function MapScreen() {
                   style={[styles.listItem, !isLast && styles.listItemBorder]}
                 >
                   <View style={[styles.listDot, { backgroundColor: color }]} />
+
                   <View style={styles.listInfo}>
                     <Text style={styles.itemTitle}>
                       {item.tipo_evento} —{" "}
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -417,63 +417,45 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "relative",
   },
-
-  map: StyleSheet.absoluteFill,
-
-  customPin: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  innerPinDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#FFF",
-  },
-
   monthFilterContainer: {
     marginHorizontal: 16,
     marginTop: 0,
     marginBottom: 12,
+    alignSelf: "flex-start",
+    minWidth: 190,
     zIndex: 10,
-    elevation: 3,
   },
 
-  monthDropdownButton: {
+  monthFilterButton: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
   },
 
-  monthDropdownText: {
+  monthFilterText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
     color: COLORS.textDark,
   },
 
-  monthDropdownOptions: {
+  monthDropdown: {
+    marginTop: 4,
     backgroundColor: "#FFFFFF",
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    borderRadius: 10,
-    marginTop: 4,
     overflow: "hidden",
-    elevation: 5,
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
   },
 
@@ -481,10 +463,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#EDF2F7",
+    borderBottomColor: "#F1F5F9",
   },
 
   monthOptionSelected: {
@@ -492,27 +474,13 @@ const styles = StyleSheet.create({
   },
 
   monthOptionText: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textDark,
   },
 
   monthOptionTextSelected: {
     color: COLORS.primaryHeader,
     fontWeight: "600",
-  },
-  mapWatermark: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "45%",
-    backgroundColor: "rgba(255, 255, 255, 0.6)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  watermarkText: {
-    fontSize: 11,
-    color: "#718096",
-    fontWeight: "500",
   },
   legendContainer: {
     flexDirection: "row",

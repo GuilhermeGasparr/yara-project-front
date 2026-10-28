@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -19,10 +20,14 @@ import { router } from "expo-router";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
+  baixarRelatorioNotificacaoXlsxRegional,
+  exportarRelatorioRegionalXlsx,
   listarNotificacoesRegionais,
   obterDadosSuperintendencia,
 } from "@/services/RegionalService";
 import type { Notificacao } from "@/services/NotificationService";
+import { baixarBlob } from "@/utils/downloadFile";
+import { ExportHeaderButton } from "@/components/ExportHeaderButton";
 
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
 
@@ -45,6 +50,29 @@ export default function RegionalNotificationsScreen() {
   // Estados do filtro por Mês
   const [mesFiltro, setMesFiltro] = useState("Todos os meses");
   const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+
+  const [exportando, setExportando] = useState(false);
+
+  async function handleExportarTodas() {
+    if (exportando) return;
+
+    try {
+      setExportando(true);
+
+      const blob = await exportarRelatorioRegionalXlsx();
+
+      baixarBlob(blob, "notificacoes_regional.xlsx");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar as notificações.",
+      );
+    } finally {
+      setExportando(false);
+    }
+  }
 
   const isSmallScreen = width < 380;
   const normalizar = (valor?: string) =>
@@ -271,7 +299,10 @@ export default function RegionalNotificationsScreen() {
 
         <Text style={styles.headerTitle}>Notificações da Regional</Text>
 
-        <View style={styles.headerPlaceholder} />
+        <ExportHeaderButton
+          onPress={handleExportarTodas}
+          loading={exportando}
+        />
       </View>
 
       {/* FILTROS */}
@@ -571,11 +602,35 @@ function NotificacaoDetailModal({
   item: Notificacao | null;
   onClose: () => void;
 }) {
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+
   if (!item) {
     return null;
   }
 
+  const notificacaoId = item.id;
   const statusStyle = getStatusStyle(item.status);
+
+  async function handleBaixarRelatorio() {
+    if (baixandoRelatorio) return;
+
+    try {
+      setBaixandoRelatorio(true);
+
+      const blob = await baixarRelatorioNotificacaoXlsxRegional(notificacaoId);
+
+      baixarBlob(blob, `notificacao_${notificacaoId}.xlsx`);
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível baixar o relatório.",
+      );
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  }
 
   return (
     <View style={styles.modalOverlay}>
@@ -596,6 +651,18 @@ function NotificacaoDetailModal({
                 : "Sem ID"}
             </Text>
           </View>
+
+          <Pressable
+            style={styles.downloadModalBtn}
+            onPress={handleBaixarRelatorio}
+            disabled={baixandoRelatorio}
+          >
+            {baixandoRelatorio ? (
+              <ActivityIndicator size="small" color={Colors.teal600} />
+            ) : (
+              <Feather name="download" size={18} color={Colors.teal600} />
+            )}
+          </Pressable>
 
           <Pressable
             style={styles.modalCloseButton}
@@ -937,10 +1004,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  headerPlaceholder: {
-    width: 38,
-  },
-
   // Filtros
   filterContainer: {
     backgroundColor: "#F4F8F7",
@@ -1267,6 +1330,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: FontSize.xs,
     color: Colors.gray400,
+  },
+
+  downloadModalBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EAF6F3",
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
   },
 
   modalCloseButton: {

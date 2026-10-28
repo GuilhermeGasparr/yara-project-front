@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 
 const BASE_URL = "https://yara-project.onrender.com";
 //const BASE_URL = "http://localhost:8000";
@@ -53,7 +54,7 @@ export async function listarNotificacoesUBS(): Promise<NotificacaoUBS[]> {
   const res = await fetch(`${BASE_URL}/ubs/notificacoes`, { headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail ?? "Erro ao buscar notificações.");
-  return data.notificacoes as NotificacaoUBS[];
+  return normalizarNotificacoes(data.notificacoes as NotificacaoUBS[]);
 }
 
 // ─── PATCH /ubs/notificacoes/:id/validar ──────────────────────────────────────
@@ -68,15 +69,41 @@ export async function validarNotificacao(id: number): Promise<void> {
   if (!res.ok) throw new Error(data.detail ?? "Erro ao validar.");
 }
 
-export async function baixarRelatorioPDFUBS(): Promise<Blob> {
+export async function baixarRelatorioXlsxUBS(): Promise<Blob> {
   const headers = await authHeader();
 
-  const res = await fetch(`${BASE_URL}/ubs/exportar_relatorio/pdf`, {
+  const res = await fetch(`${BASE_URL}/ubs/exportar_relatorio/xlsx`, {
     headers,
   });
 
   if (!res.ok) {
-    let mensagem = "Erro ao baixar o relatório PDF.";
+    let mensagem = "Erro ao baixar o relatório.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {
+      // Mantém a mensagem padrão se a resposta não for JSON.
+    }
+
+    throw new Error(mensagem);
+  }
+
+  return res.blob();
+}
+
+export async function baixarRelatorioNotificacaoXlsxUBS(
+  notificacaoId: number,
+): Promise<Blob> {
+  const headers = await authHeader();
+
+  const res = await fetch(
+    `${BASE_URL}/ubs/notificacoes/${notificacaoId}/relatorio_xlsx`,
+    { headers },
+  );
+
+  if (!res.ok) {
+    let mensagem = "Erro ao baixar o relatório da notificação.";
 
     try {
       const data = await res.json();
@@ -190,6 +217,30 @@ export async function setEncerrado(id: number): Promise<void> {
 
   if (!res.ok) {
     throw new Error(data.detail ?? "Erro ao alterar status.");
+  }
+}
+
+// ─── DELETE /ubs/notificacoes/:id/deletar ─────────────────────────────────────
+
+export async function deletarNotificacao(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(`${BASE_URL}/ubs/notificacoes/${id}/deletar`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!res.ok) {
+    let mensagem = "Erro ao excluir a notificação.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {
+      // Mantém a mensagem padrão se a resposta não for JSON.
+    }
+
+    throw new Error(mensagem);
   }
 }
 

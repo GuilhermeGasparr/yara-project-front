@@ -1,3 +1,6 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,23 +18,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = "https://yara-project.onrender.com";
 //const BASE_URL = "http://localhost:8000";
 
-async function criarCoordenadorMunicipal(payload: {
+async function criarVigilanteRegional(payload: {
   nome: string;
   cpf: string;
   senha: string;
-  municipio: string;
+  superintendencia: number;
 }): Promise<void> {
   const token = await getItem("sentinela_token");
-  const res = await fetch(`${BASE_URL}/vr/criar_conta_coordenador`, {
+  const res = await fetch(`${BASE_URL}/ve/criar_conta_vr`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -42,7 +42,9 @@ async function criarCoordenadorMunicipal(payload: {
   });
   const data = await res.json();
   if (!res.ok)
-    throw new Error(data.detail ?? "Erro ao criar conta do Coordenador.");
+    throw new Error(
+      data.detail ?? "Erro ao criar conta da Vigilância Regional.",
+    );
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -230,8 +232,9 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          O(A) coordenador(a) <Text style={{ fontWeight: "700" }}>{nome}</Text>{" "}
-          foi cadastrado(a) com sucesso no sistema.
+          O(A) vigilante regional{" "}
+          <Text style={{ fontWeight: "700" }}>{nome}</Text> foi cadastrado(a)
+          com sucesso no sistema.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}
@@ -246,7 +249,7 @@ function SuccessOverlay({
           activeOpacity={0.8}
         >
           <Text style={styles.successBtnOutlineText}>
-            Cadastrar outro Coordenador
+            Cadastrar outro Vigilante Regional
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -259,7 +262,7 @@ function SuccessOverlay({
 interface FormState {
   nome: string;
   cpf: string;
-  municipio: string;
+  superintendencia: string;
   senha: string;
   confirmarSenha: string;
 }
@@ -267,7 +270,7 @@ interface FormState {
 interface FormErrors {
   nome?: string;
   cpf?: string;
-  municipio?: string;
+  superintendencia?: string;
   senha?: string;
   confirmarSenha?: string;
 }
@@ -275,7 +278,7 @@ interface FormErrors {
 const EMPTY_FORM: FormState = {
   nome: "",
   cpf: "",
-  municipio: "",
+  superintendencia: "",
   senha: "",
   confirmarSenha: "",
 };
@@ -283,12 +286,12 @@ const EMPTY_FORM: FormState = {
 const NOT_TOUCHED: Record<keyof FormState, boolean> = {
   nome: false,
   cpf: false,
-  municipio: false,
+  superintendencia: false,
   senha: false,
   confirmarSenha: false,
 };
 
-export default function CreateCMScreen() {
+export default function CreateVRScreen() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] =
@@ -298,14 +301,14 @@ export default function CreateCMScreen() {
 
   // Refs para navegação
   const cpfRef = useRef<TextInput>(null);
-  const municipioRef = useRef<TextInput>(null);
+  const superRef = useRef<TextInput>(null);
   const senhaRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
   function validate(f: FormState): FormErrors {
     const e: FormErrors = {};
 
-    if (!f.nome.trim()) e.nome = "Nome do Coordenador obrigatório.";
+    if (!f.nome.trim()) e.nome = "Nome do Vigilante obrigatório.";
     else if (f.nome.trim().length < 3) e.nome = "Mínimo 3 caracteres.";
 
     if (!f.cpf.trim()) {
@@ -317,8 +320,10 @@ export default function CreateCMScreen() {
       }
     }
 
-    if (!f.municipio.trim()) {
-      e.municipio = "Município obrigatório.";
+    if (!f.superintendencia.trim()) {
+      e.superintendencia = "Superintendência obrigatória.";
+    } else if (!/^\d+$/.test(f.superintendencia.trim())) {
+      e.superintendencia = "Deve ser um número inteiro válido.";
     }
 
     if (!f.senha) e.senha = "Senha obrigatória.";
@@ -346,7 +351,7 @@ export default function CreateCMScreen() {
     setTouched({
       nome: true,
       cpf: true,
-      municipio: true,
+      superintendencia: true,
       senha: true,
       confirmarSenha: true,
     });
@@ -356,16 +361,16 @@ export default function CreateCMScreen() {
 
     setLoading(true);
     try {
-      await criarCoordenadorMunicipal({
+      await criarVigilanteRegional({
         nome: form.nome.trim(),
         cpf: form.cpf.replace(/\D/g, ""),
-        municipio: form.municipio.trim(),
+        superintendencia: Number(form.superintendencia.trim()),
         senha: form.senha,
       });
       setSuccess(true);
     } catch (err) {
       Alert.alert(
-        "Erro ao criar conta do Coordenador",
+        "Erro ao criar conta da Vigilância Regional",
         err instanceof Error ? err.message : "Tente novamente.",
       );
     } finally {
@@ -394,8 +399,8 @@ export default function CreateCMScreen() {
           <View style={styles.backArrow} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topbarSub}>Vigilância Regional</Text>
-          <Text style={styles.topbarTitle}>Nova Conta Coordenador</Text>
+          <Text style={styles.topbarSub}>Vigilância Estadual</Text>
+          <Text style={styles.topbarTitle}>Nova Conta Vigilância Regional</Text>
         </View>
       </View>
 
@@ -412,18 +417,18 @@ export default function CreateCMScreen() {
         >
           {/* Info card */}
           <View style={styles.infoCard}>
-            <Text style={styles.infoEmoji}>🏛️</Text>
+            <Text style={styles.infoEmoji}>🗺️</Text>
             <Text style={styles.infoText}>
-              Cadastre um novo Coordenador Municipal. Ele poderá acessar o
-              painel municipal com as credenciais informadas.
+              Cadastre um novo Vigilante Regional. Ele poderá acessar o painel
+              regional com as credenciais informadas.
             </Text>
           </View>
 
-          {/* Dados do Coordenador */}
-          <Text style={styles.sectionLabel}>Informações do Coordenador</Text>
+          {/* Dados do Vigilante */}
+          <Text style={styles.sectionLabel}>Informações do Vigilante</Text>
 
           <AnimatedField
-            label="Nome do Coordenador"
+            label="Nome do Vigilante Regional"
             value={form.nome}
             placeholder=""
             onChangeText={(v) => handleChange("nome", v)}
@@ -435,7 +440,7 @@ export default function CreateCMScreen() {
           />
 
           <AnimatedField
-            label="CPF do Coordenador"
+            label="CPF do Vigilante"
             value={form.cpf}
             placeholder=""
             onChangeText={(v) => handleChange("cpf", v)}
@@ -443,21 +448,23 @@ export default function CreateCMScreen() {
             error={touched.cpf ? errors.cpf : undefined}
             keyboardType="numeric"
             returnKeyType="next"
-            onSubmitEditing={() => municipioRef.current?.focus()}
+            onSubmitEditing={() => superRef.current?.focus()}
             inputRef={cpfRef}
           />
 
           <AnimatedField
-            label="Município"
-            value={form.municipio}
+            label="Superintendência (Número)"
+            value={form.superintendencia}
             placeholder=""
-            onChangeText={(v) => handleChange("municipio", v)}
-            onBlur={() => handleBlur("municipio")}
-            error={touched.municipio ? errors.municipio : undefined}
-            autoCapitalize="words"
+            onChangeText={(v) => handleChange("superintendencia", v)}
+            onBlur={() => handleBlur("superintendencia")}
+            error={
+              touched.superintendencia ? errors.superintendencia : undefined
+            }
+            keyboardType="numeric"
             returnKeyType="next"
             onSubmitEditing={() => senhaRef.current?.focus()}
-            inputRef={municipioRef}
+            inputRef={superRef}
           />
 
           {/* Senha */}
@@ -490,16 +497,18 @@ export default function CreateCMScreen() {
           />
 
           {/* Resumo do cadastro */}
-          {(form.nome || form.municipio) && (
+          {(form.nome || form.superintendencia) && (
             <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>Resumo do Coordenador</Text>
+              <Text style={styles.previewLabel}>Resumo do Vigilante</Text>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Nome</Text>
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={styles.previewKey}>Município</Text>
-                <Text style={styles.previewVal}>{form.municipio || "—"}</Text>
+                <Text style={styles.previewKey}>Superintendência</Text>
+                <Text style={styles.previewVal}>
+                  {form.superintendencia || "—"}
+                </Text>
               </View>
             </View>
           )}
@@ -515,7 +524,7 @@ export default function CreateCMScreen() {
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <Text style={styles.submitBtnText}>
-                Criar conta do Coordenador
+                Criar conta da Vigilância Regional
               </Text>
             )}
           </TouchableOpacity>
