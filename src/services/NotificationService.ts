@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 import { Platform } from "react-native";
 //const BASE_URL = "https://yara-project.onrender.com";
 const BASE_URL = "http://localhost:8000";
@@ -85,7 +86,7 @@ export async function listarNotificacoes(): Promise<Notificacao[]> {
   if (!res.ok) throw new Error(data.detail ?? "Erro ao carregar notificações.");
 
   // O backend retorna { "Notificações": [...] }
-  return data["Notificações"] as Notificacao[];
+  return normalizarNotificacoes(data["Notificações"] as Notificacao[]);
 }
 
 export async function baixarRelatorioNotificacaoXlsx(

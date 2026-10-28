@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 import type { Notificacao } from "./NotificationService";
 
 //const BASE_URL = "https://yara-project.onrender.com";
@@ -29,7 +30,7 @@ export async function listarNotificacoesVE(): Promise<Notificacao[]> {
     throw new Error(data.detail ?? "Erro ao carregar notificações estaduais.");
   }
 
-  return (data["Notificações"] ?? []) as Notificacao[];
+  return normalizarNotificacoes((data["Notificações"] ?? []) as Notificacao[]);
 }
 
 export async function baixarRelatorioXlsxVE(): Promise<Blob> {

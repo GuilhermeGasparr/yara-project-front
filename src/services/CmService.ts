@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 
 //const BASE_URL = "https://yara-project.onrender.com";
 const BASE_URL = "http://localhost:8000";
@@ -60,7 +61,7 @@ export async function listarNotificacoesCM(): Promise<NotificacaoCM[]> {
     throw new Error(data.detail ?? "Erro ao buscar notificações.");
   }
 
-  return (data.Notificacao ?? []) as NotificacaoCM[];
+  return normalizarNotificacoes((data.Notificacao ?? []) as NotificacaoCM[]);
 }
 
 // ─── GET /cm/dashboard_stats ──────────────────────────────────────────────────

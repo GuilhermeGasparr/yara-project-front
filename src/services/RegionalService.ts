@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 import type { Notificacao } from "./NotificationService";
 
 //const BASE_URL = "https://yara-project.onrender.com";
@@ -31,7 +32,7 @@ export async function listarNotificacoesRegionais(): Promise<Notificacao[]> {
     );
   }
 
-  return data as Notificacao[];
+  return normalizarNotificacoes(data as Notificacao[]);
 }
 export interface DadosSuperintendencia {
   nome: string;

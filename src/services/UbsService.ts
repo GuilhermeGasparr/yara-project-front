@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { normalizarNotificacoes } from "@/utils/status";
 
 //const BASE_URL = "https://yara-project.onrender.com";
 const BASE_URL = "http://localhost:8000";
@@ -53,7 +54,7 @@ export async function listarNotificacoesUBS(): Promise<NotificacaoUBS[]> {
   const res = await fetch(`${BASE_URL}/ubs/notificacoes`, { headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail ?? "Erro ao buscar notificações.");
-  return data.notificacoes as NotificacaoUBS[];
+  return normalizarNotificacoes(data.notificacoes as NotificacaoUBS[]);
 }
 
 // ─── PATCH /ubs/notificacoes/:id/validar ──────────────────────────────────────
