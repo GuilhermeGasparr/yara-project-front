@@ -20,8 +20,11 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import {
   listarNotificacoes,
   Notificacao,
-  baixarRelatorioNotificacaoPDF,
+  baixarRelatorioNotificacaoXlsx,
+  exportarRelatorioAgenteXlsx,
 } from "@/services/NotificationService";
+import { baixarBlob } from "@/utils/downloadFile";
+import { ExportHeaderButton } from "@/components/ExportHeaderButton";
 
 const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
 
@@ -35,8 +38,30 @@ export default function HistoryScreen() {
     useState<Notificacao | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [exportando, setExportando] = useState(false);
 
   const isSmallScreen = width < 380;
+
+  async function handleExportarTodas() {
+    if (exportando) return;
+
+    try {
+      setExportando(true);
+
+      const blob = await exportarRelatorioAgenteXlsx();
+
+      baixarBlob(blob, "notificacoes_agente.xlsx");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar as notificações.",
+      );
+    } finally {
+      setExportando(false);
+    }
+  }
 
   const carregarNotificacoes = useCallback(async () => {
     try {
@@ -219,9 +244,10 @@ export default function HistoryScreen() {
 
         <Text style={styles.headerTitle}>Minhas Notificações</Text>
 
-        <Pressable style={styles.searchButton} hitSlop={10}>
-          <Feather name="search" size={23} color={Colors.white} />
-        </Pressable>
+        <ExportHeaderButton
+          onPress={handleExportarTodas}
+          loading={exportando}
+        />
       </View>
 
       {/* FILTROS */}
@@ -454,14 +480,14 @@ function NotificacaoDetailModal({
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+      const blob = await baixarRelatorioNotificacaoXlsx(notificacaoId);
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `notificacao_${notificacaoId}.pdf`;
+        link.download = `notificacao_${notificacaoId}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -852,13 +878,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: "700",
     color: Colors.white,
-  },
-
-  searchButton: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   filterContainer: {

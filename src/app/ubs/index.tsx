@@ -1,3 +1,6 @@
+import { AllNotificationsButton } from "@/components/AllNotificationsButton";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { DeleteNotificationButton } from "@/components/DeleteNotificationButton";
 import { NotificationRow } from "@/components/NotificationRow";
 import { QuickActionButton } from "@/components/QuickActionbutton";
 import { StatsCard } from "@/components/StatsCard";
@@ -7,7 +10,6 @@ import { useFocusEffect } from "expo-router";
 import {
   listarNotificacoes,
   Notificacao,
-  baixarRelatorioNotificacaoPDF,
 } from "@/services/NotificationService";
 import { AgenteUser, UBSUser } from "@/types";
 import { useRouter } from "expo-router";
@@ -31,7 +33,8 @@ import { useLocalSearchParams } from "expo-router";
 import {
   listarNotificacoesUBS,
   NotificacaoUBS,
-  baixarRelatorioPDFUBS,
+  baixarRelatorioNotificacaoXlsxUBS,
+  deletarNotificacao,
   setEmInvestigacao,
   setVeridico,
   setNaoVeridico,
@@ -320,13 +323,21 @@ function NotificacaoDetailModal({
   item,
   onClose,
   onStatusUpdated,
+  onDeleted,
 }: {
   item: Notificacao | null;
   onClose: () => void;
   onStatusUpdated: (id: number) => Promise<void>;
+  onDeleted: (id: number) => void;
 }) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
   const [alterandoStatus, setAlterandoStatus] = useState(false);
+  // Troca de status aguardando confirmação (guarda "de" e "para" para o texto).
+  const [statusPendente, setStatusPendente] = useState<{
+    de: string;
+    para: NotificacaoStatus;
+  } | null>(null);
+  const [confirmarStatusAberto, setConfirmarStatusAberto] = useState(false);
 
   if (!item) return null;
 
@@ -338,14 +349,14 @@ function NotificacaoDetailModal({
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioPDFUBS();
+      const blob = await baixarRelatorioNotificacaoXlsxUBS(notificacaoId);
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `relatorio_ubs_${notificacaoId}.pdf`;
+        link.download = `notificacao_${notificacaoId}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -365,6 +376,7 @@ function NotificacaoDetailModal({
       setBaixandoRelatorio(false);
     }
   }
+  // Lança erro para o diálogo de confirmação exibir a mensagem.
   async function handleAlterarStatus(novoStatus: NotificacaoStatus) {
     const notificacao = item;
 
@@ -396,13 +408,6 @@ function NotificacaoDetailModal({
       await onStatusUpdated(notificacao.id);
 
       Alert.alert("Sucesso", "Status atualizado com sucesso.");
-    } catch (error) {
-      Alert.alert(
-        "Erro ao alterar status",
-        error instanceof Error
-          ? error.message
-          : "Não foi possível alterar o status.",
-      );
     } finally {
       setAlterandoStatus(false);
     }
@@ -439,6 +444,15 @@ function NotificacaoDetailModal({
               <Feather name="download" size={20} color={Colors.teal600} />
             )}
           </TouchableOpacity>
+
+          <DeleteNotificationButton
+            protocolo={notificacaoId}
+            style={{ marginRight: Spacing.sm }}
+            onConfirm={async () => {
+              await deletarNotificacao(notificacaoId);
+              onDeleted(notificacaoId);
+            }}
+          />
 
           <Pressable
             style={styles.modalCloseButton}
@@ -526,9 +540,13 @@ function NotificacaoDetailModal({
                         },
                         isActive && styles.acaoBtnActive,
                       ]}
-                      onPress={() =>
-                        handleAlterarStatus(acao.status as NotificacaoStatus)
-                      }
+                      onPress={() => {
+                        setStatusPendente({
+                          de: item.status,
+                          para: acao.status as NotificacaoStatus,
+                        });
+                        setConfirmarStatusAberto(true);
+                      }}
                       disabled={alterandoStatus || isActive}
                       activeOpacity={0.8}
                     >
@@ -649,6 +667,20 @@ function NotificacaoDetailModal({
           <Text style={styles.modalFooterButtonText}>Fechar relatório</Text>
         </Pressable>
       </View>
+
+      <ConfirmActionDialog
+        visible={confirmarStatusAberto}
+        onClose={() => setConfirmarStatusAberto(false)}
+        onConfirm={async () => {
+          if (statusPendente) {
+            await handleAlterarStatus(statusPendente.para);
+          }
+        }}
+        icon="refresh-cw"
+        title="Alterar status?"
+        message={`O status da notificação #${String(notificacaoId).padStart(4, "0")} passará de "${formatarStatus(statusPendente?.de ?? "")}" para "${formatarStatus(statusPendente?.para ?? "")}".`}
+        confirmLabel="Confirmar"
+      />
     </View>
   );
 }
@@ -754,6 +786,12 @@ export default function UbsHomeScreen() {
       });
     }
   }, []);
+
+  const handleDeleted = useCallback((id: number) => {
+    setNotificacoes((prev) => prev.filter((n) => n.id !== id));
+    setNotificacaoSelecionada(null);
+  }, []);
+
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal600} />
@@ -934,13 +972,9 @@ export default function UbsHomeScreen() {
         </View>
 
         {recentes.length > 0 && (
-          <TouchableOpacity
-            style={styles.verTodasBtn}
+          <AllNotificationsButton
             onPress={() => router.navigate("/ubs/notificacoes")}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.verTodasText}>Ver todas as notificações →</Text>
-          </TouchableOpacity>
+          />
         )}
 
         <View style={{ height: Spacing.xl }} />
@@ -950,6 +984,7 @@ export default function UbsHomeScreen() {
         item={notificacaoSelecionada}
         onClose={() => setNotificacaoSelecionada(null)}
         onStatusUpdated={handleStatusUpdated}
+        onDeleted={handleDeleted}
       />
     </View>
   );
@@ -1254,12 +1289,6 @@ const styles = StyleSheet.create({
     color: Colors.gray400,
     textAlign: "center",
     lineHeight: 20,
-  },
-  verTodasBtn: { alignItems: "center", paddingVertical: Spacing.md },
-  verTodasText: {
-    fontSize: FontSize.sm,
-    color: Colors.teal600,
-    fontWeight: "600",
   },
   profileBtn: {
     width: 42,

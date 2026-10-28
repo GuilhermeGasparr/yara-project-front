@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AllNotificationsButton } from "@/components/AllNotificationsButton";
 import NotificationsByCategory from "@/components/regional/NotificationsByCategory";
 import RegionalAlert from "@/components/regional/RegionalAlert";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import type { Notificacao } from "@/services/NotificationService";
 import {
-  exportarRelatorioRegionalPDF,
+  baixarRelatorioNotificacaoXlsxRegional,
+  exportarRelatorioRegionalXlsx,
   listarNotificacoesRegionais,
 } from "@/services/RegionalService";
+import { baixarBlob } from "@/utils/downloadFile";
 import { gerarDashboardRegional } from "@/utils/regionalDashboard";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -177,7 +180,32 @@ function NotificacaoDetailModal({
   item: Notificacao | null;
   onClose: () => void;
 }) {
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+
   if (!item) return null;
+
+  const notificacaoId = item.id;
+
+  async function handleBaixarRelatorio() {
+    if (baixandoRelatorio) return;
+
+    try {
+      setBaixandoRelatorio(true);
+
+      const blob = await baixarRelatorioNotificacaoXlsxRegional(notificacaoId);
+
+      baixarBlob(blob, `notificacao_${notificacaoId}.xlsx`);
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível baixar o relatório.",
+      );
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  }
 
   const data = new Date(item.data_envio);
 
@@ -210,6 +238,19 @@ function NotificacaoDetailModal({
               Notificação #{String(item.id).padStart(4, "0")}
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.downloadModalBtn}
+            onPress={handleBaixarRelatorio}
+            disabled={baixandoRelatorio}
+            activeOpacity={0.7}
+          >
+            {baixandoRelatorio ? (
+              <ActivityIndicator size="small" color={Colors.teal600} />
+            ) : (
+              <Feather name="download" size={18} color={Colors.teal600} />
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
             <Text style={styles.modalCloseText}>×</Text>
@@ -346,20 +387,20 @@ export default function RegionalHomeScreen() {
 
     return c;
   }, [notificacoes]);
-  const [exportandoPDF, setExportandoPDF] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
-  async function handleExportarPDF() {
+  async function handleExportar() {
     try {
-      setExportandoPDF(true);
+      setExportando(true);
 
-      const blob = await exportarRelatorioRegionalPDF();
+      const blob = await exportarRelatorioRegionalXlsx();
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = "relatorio_regional.pdf";
+        link.download = "relatorio_regional.xlsx";
 
         document.body.appendChild(link);
         link.click();
@@ -371,7 +412,7 @@ export default function RegionalHomeScreen() {
 
       Alert.alert(
         "Relatório gerado",
-        "O PDF foi recebido. Para salvá-lo no dispositivo, é necessário implementar o compartilhamento ou salvamento nativo.",
+        "A planilha foi recebida. Para salvá-la no dispositivo, é necessário implementar o compartilhamento ou salvamento nativo.",
       );
     } catch (error) {
       Alert.alert(
@@ -381,7 +422,7 @@ export default function RegionalHomeScreen() {
           : "Não foi possível gerar o relatório.",
       );
     } finally {
-      setExportandoPDF(false);
+      setExportando(false);
     }
   }
   const getInitials = (nome: string) => {
@@ -605,24 +646,24 @@ export default function RegionalHomeScreen() {
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <TouchableOpacity
-              onPress={handleExportarPDF}
-              disabled={exportandoPDF}
+              onPress={handleExportar}
+              disabled={exportando}
               activeOpacity={0.8}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                opacity: exportandoPDF ? 0.6 : 1,
+                opacity: exportando ? 0.6 : 1,
               }}
             >
-              {exportandoPDF ? (
+              {exportando ? (
                 <ActivityIndicator size="small" color={Colors.teal600} />
               ) : (
                 <Feather name="download" size={16} color={Colors.teal600} />
               )}
 
               <Text style={styles.seeAll}>
-                {exportandoPDF ? "Gerando..." : "Exportar PDF"}
+                {exportando ? "Gerando..." : "Exportar XLSX"}
               </Text>
             </TouchableOpacity>
 
@@ -659,6 +700,13 @@ export default function RegionalHomeScreen() {
             />
           ))
         )}
+
+        {!loading && ultimasNotificacoes.length > 0 ? (
+          <AllNotificationsButton
+            onPress={() => router.navigate("/regional/notificacoes")}
+          />
+        ) : null}
+
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
@@ -1059,6 +1107,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.white,
   },
+  downloadModalBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EAF6F3",
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+
   modalCloseButton: {
     width: 34,
     height: 34,

@@ -1,3 +1,7 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,14 +19,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
-const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 async function criarUbs(payload: {
   nome: string;
@@ -188,7 +188,9 @@ function AnimatedField({
         )}
       </Animated.View>
 
-      {!!error && <Animated.Text style={styles.fieldError}>⚠ {error}</Animated.Text>}
+      {!!error && (
+        <Animated.Text style={styles.fieldError}>⚠ {error}</Animated.Text>
+      )}
     </View>
   );
 }
@@ -228,8 +230,8 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta UBS criada!</Text>
         <Text style={styles.successSub}>
-          A unidade <Text style={{ fontWeight: "700" }}>{nome}</Text> foi cadastrada
-          com sucesso no sistema.
+          A unidade <Text style={{ fontWeight: "700" }}>{nome}</Text> foi
+          cadastrada com sucesso no sistema.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}

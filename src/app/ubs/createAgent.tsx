@@ -1,3 +1,7 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,15 +19,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
-//const BASE_URL = "http://localhost:8000";
+const BASE_URL = "http://localhost:8000";
 
-const BASE_URL = "https://yara-project.onrender.com";
+//const BASE_URL = "https://yara-project.onrender.com";
 async function criarAgente(payload: {
   nome: string;
   cpf: string;

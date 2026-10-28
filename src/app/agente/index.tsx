@@ -1,3 +1,4 @@
+import { AllNotificationsButton } from "@/components/AllNotificationsButton";
 import { NotificationRow } from "@/components/NotificationRow";
 import { QuickActionButton } from "@/components/QuickActionbutton";
 import { StatsCard } from "@/components/StatsCard";
@@ -8,7 +9,7 @@ import {
   listarNotificacoes,
   Notificacao,
   NotificacaoStatus,
-  baixarRelatorioNotificacaoPDF,
+  baixarRelatorioNotificacaoXlsx,
 } from "@/services/NotificationService";
 import { AgenteUser } from "@/types";
 import { useRouter } from "expo-router";
@@ -328,14 +329,14 @@ function NotificacaoDetailModal({
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioNotificacaoPDF(notificacaoId);
+      const blob = await baixarRelatorioNotificacaoXlsx(notificacaoId);
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = `notificacao_${notificacaoId}.pdf`;
+        link.download = `notificacao_${notificacaoId}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -806,13 +807,7 @@ export default function AgenteHomeScreen() {
         </View>
 
         {recentes.length > 0 && (
-          <TouchableOpacity
-            style={styles.verTodasBtn}
-            onPress={() => goTo("history")}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.verTodasText}>Ver todas as notificações →</Text>
-          </TouchableOpacity>
+          <AllNotificationsButton onPress={() => goTo("history")} />
         )}
 
         <View style={{ height: Spacing.xl }} />
@@ -1078,12 +1073,6 @@ const styles = StyleSheet.create({
     color: Colors.gray400,
     textAlign: "center",
     lineHeight: 20,
-  },
-  verTodasBtn: { alignItems: "center", paddingVertical: Spacing.md },
-  verTodasText: {
-    fontSize: FontSize.sm,
-    color: Colors.teal600,
-    fontWeight: "600",
   },
   profileBtn: {
     width: 42,

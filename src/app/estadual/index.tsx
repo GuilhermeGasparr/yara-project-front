@@ -1,3 +1,4 @@
+import { AllNotificationsButton } from "@/components/AllNotificationsButton";
 import { StatsCard } from "@/components/StatsCard";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
@@ -19,7 +20,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { baixarRelatorioPDFVE } from "@/services/VeService";
 /* ============================================================================
  * Helpers
  * ========================================================================== */
@@ -736,19 +736,9 @@ export default function EstadualHomeScreen() {
         </View>
 
         {!loading && notificacoes.length > 0 ? (
-          <TouchableOpacity
-            style={styles.allNotificationsButton}
+          <AllNotificationsButton
             onPress={() => router.push("/estadual/notificacoes")}
-            activeOpacity={0.85}
-          >
-            <Feather name="list" size={18} color={Colors.teal600} />
-
-            <Text style={styles.allNotificationsText}>
-              Visualizar todas as notificações
-            </Text>
-
-            <Feather name="arrow-right" size={17} color={Colors.teal600} />
-          </TouchableOpacity>
+          />
         ) : null}
 
         <View style={styles.bottomSpace} />
@@ -1329,26 +1319,6 @@ const styles = StyleSheet.create({
   /* --------------------------------------------------------------------------
    * Botão de notificações
    * ------------------------------------------------------------------------ */
-
-  allNotificationsButton: {
-    marginTop: Spacing.lg,
-    minHeight: 50,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.12)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.md,
-  },
-
-  allNotificationsText: {
-    marginHorizontal: 9,
-    fontSize: FontSize.sm,
-    fontWeight: "700",
-    color: Colors.teal600,
-  },
 
   bottomSpace: {
     height: Spacing.xxl,

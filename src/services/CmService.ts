@@ -1,7 +1,7 @@
 import { getItem } from "@/utils/storage";
 
-const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 const SKIP = { "ngrok-skip-browser-warning": "true" };
 
@@ -111,6 +111,31 @@ export const setNaoVeridico = (id: number) =>
   patchStatus(id, "status_nao_veridico");
 
 export const setEncerrado = (id: number) => patchStatus(id, "status_encerrado");
+
+// ─── DELETE /cm/notificacoes/:id/deletar ──────────────────────────────────────
+
+export async function deletarNotificacao(id: number): Promise<void> {
+  const headers = await authHeader();
+
+  const res = await fetch(`${BASE_URL}/cm/notificacoes/${id}/deletar`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!res.ok) {
+    let mensagem = "Erro ao excluir a notificação.";
+
+    try {
+      const data = await res.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {
+      // Mantém a mensagem padrão se a resposta não for JSON.
+    }
+
+    throw new Error(mensagem);
+  }
+}
+
 // ─── GET /cm/exportar_relatorio ───────────────────────────────────────────────
 
 export async function exportarRelatorio(): Promise<unknown[]> {
@@ -121,16 +146,16 @@ export async function exportarRelatorio(): Promise<unknown[]> {
   return data.relatorio ?? [];
 }
 
-export async function exportarRelatorioPDF(): Promise<Blob> {
+export async function exportarRelatorioXlsx(): Promise<Blob> {
   const headers = await authHeader();
 
-  const res = await fetch(`${BASE_URL}/cm/exportar_relatorio/pdf`, {
+  const res = await fetch(`${BASE_URL}/cm/exportar_relatorio/xlsx`, {
     method: "GET",
     headers,
   });
 
   if (!res.ok) {
-    let message = "Erro ao gerar PDF.";
+    let message = "Erro ao gerar planilha.";
 
     try {
       const data = await res.json();
@@ -143,13 +168,13 @@ export async function exportarRelatorioPDF(): Promise<Blob> {
   return await res.blob();
 }
 
-export async function baixarRelatorioNotificacaoPDF(
+export async function baixarRelatorioNotificacaoXlsx(
   notificacaoId: number,
 ): Promise<Blob> {
   const headers = await authHeader();
 
   const res = await fetch(
-    `${BASE_URL}/cm/notificacoes/${notificacaoId}/relatorio_pdf`,
+    `${BASE_URL}/cm/notificacoes/${notificacaoId}/relatorio_xlsx`,
     {
       method: "GET",
       headers,

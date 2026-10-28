@@ -1,9 +1,8 @@
 import { getItem } from "@/utils/storage";
 import type { Notificacao } from "./NotificationService";
 
-const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
-
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 async function authHeader(): Promise<Record<string, string>> {
   const token = await getItem("sentinela_token");
@@ -42,10 +41,9 @@ export interface DadosSuperintendencia {
 export async function obterDadosSuperintendencia(): Promise<DadosSuperintendencia> {
   const headers = await authHeader();
 
-  const response = await fetch(
-    `${BASE_URL}/vr/dados_superintendencia_coads`,
-    { headers },
-  );
+  const response = await fetch(`${BASE_URL}/vr/dados_superintendencia_coads`, {
+    headers,
+  });
 
   const data = await response.json();
 
@@ -61,23 +59,45 @@ export async function obterDadosSuperintendencia(): Promise<DadosSuperintendenci
 
   return {
     nome: data[0].Superintendencia,
-    coads: data.map(
-      (item: { COADS: string }) => item.COADS,
-    ),
+    coads: data.map((item: { COADS: string }) => item.COADS),
   };
 }
 
-
-export async function exportarRelatorioRegionalPDF(): Promise<Blob> {
+export async function baixarRelatorioNotificacaoXlsxRegional(
+  notificacaoId: number,
+): Promise<Blob> {
   const headers = await authHeader();
 
   const response = await fetch(
-    `${BASE_URL}/vr/exportar_relatorio/pdf`,
+    `${BASE_URL}/vr/notificacoes/${notificacaoId}/relatorio_xlsx`,
     { headers },
   );
 
   if (!response.ok) {
-    let mensagem = "Não foi possível gerar o PDF.";
+    let mensagem = "Erro ao baixar o relatório da notificação.";
+
+    try {
+      const data = await response.json();
+      mensagem = data.detail ?? mensagem;
+    } catch {
+      // Mantém a mensagem padrão se a resposta não for JSON.
+    }
+
+    throw new Error(mensagem);
+  }
+
+  return response.blob();
+}
+
+export async function exportarRelatorioRegionalXlsx(): Promise<Blob> {
+  const headers = await authHeader();
+
+  const response = await fetch(`${BASE_URL}/vr/exportar_relatorio/xlsx`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    let mensagem = "Não foi possível gerar a planilha.";
 
     try {
       const data = await response.json();

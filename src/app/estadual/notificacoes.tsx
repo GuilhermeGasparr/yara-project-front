@@ -28,8 +28,11 @@ import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
   listarNotificacoesVE,
-  baixarRelatorioPDFVE,
+  baixarRelatorioNotificacaoXlsxVE,
+  baixarRelatorioXlsxVE,
 } from "@/services/VeService";
+import { baixarBlob } from "@/utils/downloadFile";
+import { ExportHeaderButton } from "@/components/ExportHeaderButton";
 
 import type { Notificacao } from "@/services/NotificationService";
 
@@ -285,22 +288,22 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(40)).current;
   const scaleAnim = useRef(new Animated.Value(0.96)).current;
-  const [exportandoPDF, setExportandoPDF] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
-  async function handleExportarPDF() {
-    if (exportandoPDF) return;
+  async function handleExportar() {
+    if (!item || exportando) return;
 
     try {
-      setExportandoPDF(true);
+      setExportando(true);
 
-      const blob = await baixarRelatorioPDFVE();
+      const blob = await baixarRelatorioNotificacaoXlsxVE(item.id);
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = "relatorio_vigilancia_estadual.pdf";
+        link.download = `notificacao_${item.id}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -310,7 +313,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
       } else {
         Alert.alert(
           "Relatório recebido",
-          "O PDF foi gerado, mas o salvamento no dispositivo precisa ser implementado.",
+          "A planilha foi gerada, mas o salvamento no dispositivo precisa ser implementado.",
         );
       }
     } catch (error) {
@@ -321,7 +324,7 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
           : "Não foi possível gerar o relatório.",
       );
     } finally {
-      setExportandoPDF(false);
+      setExportando(false);
     }
   }
 
@@ -435,11 +438,11 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
 
             <TouchableOpacity
               style={styles.exportButton}
-              onPress={handleExportarPDF}
-              disabled={exportandoPDF}
+              onPress={handleExportar}
+              disabled={exportando}
               activeOpacity={0.8}
             >
-              {exportandoPDF ? (
+              {exportando ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Feather name="download" size={18} color="#FFFFFF" />
@@ -561,6 +564,29 @@ export default function EstadualNotificationsScreen() {
 
   const [selectedNotification, setSelectedNotification] =
     useState<Notificacao | null>(null);
+
+  const [exportandoTodas, setExportandoTodas] = useState(false);
+
+  async function handleExportarTodas() {
+    if (exportandoTodas) return;
+
+    try {
+      setExportandoTodas(true);
+
+      const blob = await baixarRelatorioXlsxVE();
+
+      baixarBlob(blob, "notificacoes_estadual.xlsx");
+    } catch (error) {
+      Alert.alert(
+        "Erro ao exportar",
+        error instanceof Error
+          ? error.message
+          : "Não foi possível exportar as notificações.",
+      );
+    } finally {
+      setExportandoTodas(false);
+    }
+  }
 
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
@@ -723,6 +749,11 @@ export default function EstadualNotificationsScreen() {
           <Text style={styles.headerLabel}>Vigilância Estadual</Text>
           <Text style={styles.headerTitle}>Notificações</Text>
         </View>
+
+        <ExportHeaderButton
+          onPress={handleExportarTodas}
+          loading={exportandoTodas}
+        />
       </View>
 
       <ScrollView

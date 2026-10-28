@@ -1,3 +1,6 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,14 +18,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 async function criarVigilanteRegional(payload: {
   nome: string;
@@ -42,7 +42,9 @@ async function criarVigilanteRegional(payload: {
   });
   const data = await res.json();
   if (!res.ok)
-    throw new Error(data.detail ?? "Erro ao criar conta da Vigilância Regional.");
+    throw new Error(
+      data.detail ?? "Erro ao criar conta da Vigilância Regional.",
+    );
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -456,7 +458,9 @@ export default function CreateVRScreen() {
             placeholder=""
             onChangeText={(v) => handleChange("superintendencia", v)}
             onBlur={() => handleBlur("superintendencia")}
-            error={touched.superintendencia ? errors.superintendencia : undefined}
+            error={
+              touched.superintendencia ? errors.superintendencia : undefined
+            }
             keyboardType="numeric"
             returnKeyType="next"
             onSubmitEditing={() => senhaRef.current?.focus()}

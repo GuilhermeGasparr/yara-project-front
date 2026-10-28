@@ -1,3 +1,6 @@
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import { getItem } from "@/utils/storage";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,14 +18,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import { getItem } from "@/utils/storage";
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
+//const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 async function criarCoordenadorMunicipal(payload: {
   nome: string;

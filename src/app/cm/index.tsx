@@ -17,10 +17,11 @@ import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import {
-  baixarRelatorioNotificacaoPDF,
-  exportarRelatorioPDF,
+  baixarRelatorioNotificacaoXlsx,
+  exportarRelatorioXlsx,
   buscarDashboardStats,
   DashboardStats,
+  deletarNotificacao,
   listarNotificacoesCM,
   NotificacaoCM,
   setEmInvestigacao,
@@ -31,6 +32,8 @@ import {
 } from "@/services/CmService";
 import { Feather } from "@expo/vector-icons";
 import { StatsCard } from "@/components/StatsCard";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { DeleteNotificationButton } from "@/components/DeleteNotificationButton";
 
 // ─── Configurações de status ──────────────────────────────────────────────────
 
@@ -97,12 +100,18 @@ function StatusBadge({ status }: { status: StatusCM }) {
   );
 }
 
+function rotuloStatus(status?: string): string {
+  if (!status) return "";
+  return STATUS_CFG[status]?.label ?? status;
+}
+
 // ─── Modal de detalhes + ações ────────────────────────────────────────────────
 
 interface DetailModalProps {
   notif: NotificacaoCM | null;
   onClose: () => void;
   onStatusChange: (id: number, novoStatus: StatusCM) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
   loadingId: number | null;
 }
 
@@ -110,9 +119,16 @@ function DetailModal({
   notif,
   onClose,
   onStatusChange,
+  onDelete,
   loadingId,
 }: DetailModalProps) {
   const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
+  // Troca de status aguardando confirmação (guarda "de" e "para" para o texto).
+  const [statusPendente, setStatusPendente] = useState<{
+    de: StatusCM;
+    para: StatusCM;
+  } | null>(null);
+  const [confirmarStatusAberto, setConfirmarStatusAberto] = useState(false);
   if (!notif) return null;
 
   async function handleBaixarRelatorio() {
@@ -121,7 +137,7 @@ function DetailModal({
     try {
       setBaixandoRelatorio(true);
 
-      const blob = await baixarRelatorioNotificacaoPDF(notif.id);
+      const blob = await baixarRelatorioNotificacaoXlsx(notif.id);
 
       // Expo Web / navegador
       if (Platform.OS === "web") {
@@ -129,7 +145,7 @@ function DetailModal({
 
         const link = document.createElement("a");
         link.href = url;
-        link.download = `notificacao_${notif.id}.pdf`;
+        link.download = `notificacao_${notif.id}.xlsx`;
 
         document.body.appendChild(link);
         link.click();
@@ -242,6 +258,12 @@ function DetailModal({
               )}
             </TouchableOpacity>
 
+            {/* EXCLUIR */}
+            <DeleteNotificationButton
+              protocolo={notif.id}
+              onConfirm={() => onDelete(notif.id)}
+            />
+
             {/* FECHAR */}
             <TouchableOpacity onPress={onClose} style={s.closeBtn} hitSlop={12}>
               <Text style={s.closeBtnText}>✕</Text>
@@ -296,7 +318,10 @@ function DetailModal({
                     { backgroundColor: acao.bg, borderColor: acao.border },
                     isActive && s.acaoBtnActive,
                   ]}
-                  onPress={() => onStatusChange(notif.id, acao.status)}
+                  onPress={() => {
+                    setStatusPendente({ de: notif.status, para: acao.status });
+                    setConfirmarStatusAberto(true);
+                  }}
                   disabled={isLoading || isActive}
                   activeOpacity={0.8}
                 >
@@ -319,6 +344,20 @@ function DetailModal({
 
           <View style={{ height: Spacing.xxl }} />
         </ScrollView>
+
+        <ConfirmActionDialog
+          visible={confirmarStatusAberto}
+          onClose={() => setConfirmarStatusAberto(false)}
+          onConfirm={async () => {
+            if (statusPendente) {
+              await onStatusChange(notif.id, statusPendente.para);
+            }
+          }}
+          icon="refresh-cw"
+          title="Alterar status?"
+          message={`O status da notificação #${String(notif.id).padStart(4, "0")} passará de "${rotuloStatus(statusPendente?.de)}" para "${rotuloStatus(statusPendente?.para)}".`}
+          confirmLabel="Confirmar"
+        />
       </View>
     </Modal>
   );
@@ -497,6 +536,7 @@ export default function CMScreen() {
     return notificacoesDoMes.filter((n) => n.status === filtro);
   }, [notificacoesDoMes, filtro]);
 
+  // Lança erro para o diálogo de confirmação exibir a mensagem.
   async function handleStatusChange(id: number, novoStatus: StatusCM) {
     setLoadingId(id);
     try {
@@ -524,14 +564,21 @@ export default function CMScreen() {
       buscarDashboardStats()
         .then(setStats)
         .catch(() => {});
-    } catch (err) {
-      Alert.alert(
-        "Erro",
-        err instanceof Error ? err.message : "Tente novamente.",
-      );
     } finally {
       setLoadingId(null);
     }
+  }
+
+  // Lança erro para o diálogo de confirmação exibir a mensagem.
+  async function handleDelete(id: number) {
+    await deletarNotificacao(id);
+
+    setNotificacoes((prev) => prev.filter((n) => n.id !== id));
+    setSelectedNotif(null);
+
+    buscarDashboardStats()
+      .then(setStats)
+      .catch(() => {});
   }
 
   function handleProfile() {
@@ -545,14 +592,14 @@ export default function CMScreen() {
     try {
       setExportando(true);
 
-      const blob = await exportarRelatorioPDF();
+      const blob = await exportarRelatorioXlsx();
 
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = url;
-        link.download = "relatorio_notificacoes_cm.pdf";
+        link.download = "relatorio_notificacoes_cm.xlsx";
 
         document.body.appendChild(link);
         link.click();
@@ -562,7 +609,7 @@ export default function CMScreen() {
       } else {
         Alert.alert(
           "Relatório gerado",
-          "O PDF foi recebido, mas precisamos implementar o salvamento ou compartilhamento do arquivo no dispositivo.",
+          "A planilha foi recebida, mas precisamos implementar o salvamento ou compartilhamento do arquivo no dispositivo.",
         );
       }
     } catch (error) {
@@ -870,6 +917,7 @@ export default function CMScreen() {
         notif={selectedNotif}
         onClose={() => setSelectedNotif(null)}
         onStatusChange={handleStatusChange}
+        onDelete={handleDelete}
         loadingId={loadingId}
       />
     </View>
@@ -1232,12 +1280,14 @@ const s = StyleSheet.create({
     marginLeft: 20,
   },
   downloadModalBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EAF6F3",
+    borderWidth: 1,
+    borderColor: "#CDE8E1",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: Spacing.sm,
   },
   cardFooter: {
     flexDirection: "row",
