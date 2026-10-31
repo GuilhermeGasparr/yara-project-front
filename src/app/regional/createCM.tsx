@@ -42,7 +42,7 @@ async function criarCoordenadorMunicipal(payload: {
   });
   const data = await res.json();
   if (!res.ok)
-    throw new Error(data.detail ?? "Erro ao criar conta do Coordenador.");
+    throw new Error(data.detail ?? "Erro ao criar conta do Vigilante Municipal.");
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          O(A) coordenador(a) <Text style={{ fontWeight: "700" }}>{nome}</Text>{" "}
+          O(A) Vigilante <Text style={{ fontWeight: "700" }}>{nome}</Text>{" "}
           foi cadastrado(a) com sucesso no sistema.
         </Text>
         <TouchableOpacity
@@ -246,7 +246,7 @@ function SuccessOverlay({
           activeOpacity={0.8}
         >
           <Text style={styles.successBtnOutlineText}>
-            Cadastrar outro Coordenador
+            Cadastrar outro Vigilante
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -305,7 +305,7 @@ export default function CreateCMScreen() {
   function validate(f: FormState): FormErrors {
     const e: FormErrors = {};
 
-    if (!f.nome.trim()) e.nome = "Nome do Coordenador obrigatório.";
+    if (!f.nome.trim()) e.nome = "Nome do Vigilante obrigatório.";
     else if (f.nome.trim().length < 3) e.nome = "Mínimo 3 caracteres.";
 
     if (!f.cpf.trim()) {
@@ -365,7 +365,7 @@ export default function CreateCMScreen() {
       setSuccess(true);
     } catch (err) {
       Alert.alert(
-        "Erro ao criar conta do Coordenador",
+        "Erro ao criar conta do Vigilante",
         err instanceof Error ? err.message : "Tente novamente.",
       );
     } finally {
@@ -395,7 +395,7 @@ export default function CreateCMScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.topbarSub}>Vigilância Regional</Text>
-          <Text style={styles.topbarTitle}>Nova Conta Coordenador</Text>
+          <Text style={styles.topbarTitle}>Nova Conta Vigilante Municipal</Text>
         </View>
       </View>
 
@@ -414,16 +414,16 @@ export default function CreateCMScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.infoEmoji}>🏛️</Text>
             <Text style={styles.infoText}>
-              Cadastre um novo Coordenador Municipal. Ele poderá acessar o
+              Cadastre um novo Vigilante Municipal. Ele poderá acessar o
               painel municipal com as credenciais informadas.
             </Text>
           </View>
 
           {/* Dados do Coordenador */}
-          <Text style={styles.sectionLabel}>Informações do Coordenador</Text>
+          <Text style={styles.sectionLabel}>Informações do Vigilante Municipal</Text>
 
           <AnimatedField
-            label="Nome do Coordenador"
+            label="Nome do Vigilante Municipal"
             value={form.nome}
             placeholder=""
             onChangeText={(v) => handleChange("nome", v)}
@@ -435,7 +435,7 @@ export default function CreateCMScreen() {
           />
 
           <AnimatedField
-            label="CPF do Coordenador"
+            label="CPF do Vigilante Municipal"
             value={form.cpf}
             placeholder=""
             onChangeText={(v) => handleChange("cpf", v)}
@@ -492,7 +492,7 @@ export default function CreateCMScreen() {
           {/* Resumo do cadastro */}
           {(form.nome || form.municipio) && (
             <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>Resumo do Coordenador</Text>
+              <Text style={styles.previewLabel}>Resumo do Vigilante Municipal</Text>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Nome</Text>
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
@@ -515,7 +515,7 @@ export default function CreateCMScreen() {
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <Text style={styles.submitBtnText}>
-                Criar conta do Coordenador
+                Criar conta do Vigilante Municipal
               </Text>
             )}
           </TouchableOpacity>

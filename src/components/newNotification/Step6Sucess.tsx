@@ -36,8 +36,7 @@ export function Step6Sucesso({ notificacaoId }: Props) {
           </View>
         </View>
         <Text style={styles.statusInfo}>
-          A Unidade de Saúde irá validar e encaminhar à Coordenação Municipal de
-          Vigilância.
+          A Unidade de Saúde irá validar e encaminhar à Vigilância Municipal
         </Text>
       </View>
 

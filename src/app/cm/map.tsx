@@ -221,7 +221,7 @@ export default function CMMapScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Mapa do Município</Text>
             <Text style={styles.headerSubtitle}>
-              Ocorrências da coordenação municipal
+              Ocorrências da Vigilância Municipal
             </Text>
           </View>
 

@@ -109,11 +109,11 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.name}>
-            {cm?.nome ?? "Coordenador Municipal"}
+            {cm?.nome ?? "Vigilante Municipal"}
           </Text>
 
           <Text style={styles.cargo}>
-            {cm?.cargo ?? "Coordenador Municipal"}
+            {cm?.cargo ?? "Vigilante Municipal"}
           </Text>
         </View>
       </View>

@@ -627,10 +627,10 @@ export default function RegionalHomeScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.createCMTitle}>
-              Criar Conta Coordenador Municipal
+              Criar Conta Vigilante Municipal
             </Text>
             <Text style={styles.createCMSub}>
-              Cadastre um novo coordenador para um município
+              Cadastre um novo Vigilante Municipal
             </Text>
           </View>
           <Feather name="chevron-right" size={20} color={Colors.gray400} />

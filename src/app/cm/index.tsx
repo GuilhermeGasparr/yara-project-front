@@ -586,7 +586,7 @@ export default function CMScreen() {
   }
 
   const municipio = (user as any)?.municipio ?? "Município";
-  const nome = (user as any)?.nome ?? "Coordenador";
+  const nome = (user as any)?.nome ?? "Vigilante Municipal";
 
   async function handleExportarNotificacoes() {
     try {
@@ -631,7 +631,7 @@ export default function CMScreen() {
       {/* Topbar */}
       <View style={s.topbar}>
         <View style={{ flex: 1 }}>
-          <Text style={s.topbarSub}>Coordenação Municipal</Text>
+          <Text style={s.topbarSub}>Vigilância Municipal</Text>
 
           <Text style={s.topbarTitle} numberOfLines={1}>
             {municipio}
