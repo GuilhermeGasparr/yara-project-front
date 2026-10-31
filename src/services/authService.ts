@@ -69,7 +69,7 @@ export function buildUserFromToken(
       id,
       nome: (extras?.["nome"] as string) ?? "",
       cpf: (extras?.["cpf"] as string) ?? "",
-      cargo: (extras?.["cargo"] as string) ?? "Coordenador Municipal",
+      cargo: (extras?.["cargo"] as string) ?? "Vigilante Municipal",
       municipio: (extras?.["municipio"] as string) ?? "",
     };
   }

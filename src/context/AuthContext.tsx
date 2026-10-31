@@ -122,7 +122,7 @@ if (me.role === "agente") {
           id: usuario.id,
           nome: usuario.nome,
           cpf: usuario.cpf,
-          cargo: "Coordenador Municipal",
+          cargo: "Vigilante Municipal",
           municipio: usuario.municipio ?? "",
         };
       } else if (me.role === "vr") {

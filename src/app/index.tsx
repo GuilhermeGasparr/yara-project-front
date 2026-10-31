@@ -53,7 +53,7 @@ function RoleSelector({
   const roles = [
     { value: "ACS/ACE", label: "ACS / ACE", icon: "users" },
     { value: "UBS", label: "Equipe UBS", icon: "home" },
-    { value: "CM", label: "Coord. Municipal", icon: "briefcase" },
+    { value: "CM", label: "Vigilante Municipal", icon: "briefcase" },
     { value: "VR", label: "Vig. Regional", icon: "map" },
     { value: "VE", label: "Vig. Estadual", icon: "globe" },
   ] as const;
@@ -355,7 +355,7 @@ function RoleSelector({
               selectedRole === "CM" && styles.selectorTextActive,
             ]}
           >
-            Coord. Municipal
+            Vigilante Municipal
           </Text>
         </Animated.View>
       </Pressable>
@@ -712,7 +712,7 @@ export default function LoginScreen() {
             <Text style={styles.helpText}>
               Problemas de acesso?{" "}
               <Text style={styles.helpLink}>
-                Contate a Coordenação Municipal.
+                Contate a Vigilância Municipal.
               </Text>
             </Text>
           </Animated.View>

@@ -417,7 +417,7 @@ export default function CreateUbsScreen() {
           <View style={styles.backArrow} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.topbarSub}>Coordenação Municipal</Text>
+          <Text style={styles.topbarSub}>Vigilância Municipal</Text>
           <Text style={styles.topbarTitle}>Nova Conta UBS</Text>
         </View>
       </View>
