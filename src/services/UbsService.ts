@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 import { normalizarNotificacoes } from "@/utils/status";
 
 const BASE_URL = "https://yara-project.onrender.com";
@@ -69,10 +70,14 @@ export async function validarNotificacao(id: number): Promise<void> {
   if (!res.ok) throw new Error(data.detail ?? "Erro ao validar.");
 }
 
-export async function baixarRelatorioXlsxUBS(): Promise<Blob> {
+export async function baixarRelatorioXlsxUBS(
+  filtros?: FiltrosRelatorio,
+): Promise<Blob> {
   const headers = await authHeader();
 
-  const res = await fetch(`${BASE_URL}/ubs/exportar_relatorio/xlsx`, {
+  const url = `${BASE_URL}/ubs/exportar_relatorio/xlsx${montarQueryRelatorio(filtros)}`;
+
+  const res = await fetch(url, {
     headers,
   });
 

@@ -9,7 +9,6 @@ import {
   Alert,
   Text,
   View,
-  useWindowDimensions,
   TouchableOpacity,
   Platform,
   ScrollView,
@@ -31,34 +30,59 @@ import {
   setEncerrado,
 } from "@/services/UbsService";
 import { baixarBlob } from "@/utils/downloadFile";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { DeleteNotificationButton } from "@/components/DeleteNotificationButton";
 import { ExportHeaderButton } from "@/components/ExportHeaderButton";
-const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
+import { DateRangeFilter } from "@/components/filters/DateRangeFilter";
+import { FilterChipGroup } from "@/components/filters/FilterChipGroup";
+import {
+  CATEGORIAS_FILTRO,
+  STATUS_FILTRO,
+  correspondeCategoria,
+  correspondeStatus,
+  dentroDoPeriodo,
+  periodoInvalido,
+  valorFiltro,
+} from "@/utils/filtros";
 
 export default function NotificacoesUBSScreen() {
-  const { width } = useWindowDimensions();
   const [agenteFiltro, setAgenteFiltro] = useState<number | null>(null);
-  const [dropdownAgentesVisivel, setDropdownAgentesVisivel] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
-  const [filtro, setFiltro] = useState("Todos");
-  const [mesFiltro, setMesFiltro] = useState("Todos os meses");
-  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+  const [categoriaFiltro, setCategoriaFiltro] = useState("TODOS");
+  const [statusFiltro, setStatusFiltro] = useState("TODOS");
+
+  // Período (YYYY-MM-DD); vazio = sem limite
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [selectedNotification, setSelectedNotification] =
     useState<NotificacaoUBS | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [mostrarOpcoesAgentes, setMostrarOpcoesAgentes] = useState(false);
   const [exportando, setExportando] = useState(false);
-  const isSmallScreen = width < 380;
 
   async function handleExportarTodas() {
     if (exportando) return;
 
+    if (periodoInvalido(dataInicio, dataFim)) {
+      Alert.alert(
+        "Período inválido",
+        "A data início não pode ser posterior à data fim.",
+      );
+      return;
+    }
+
     try {
       setExportando(true);
 
-      const blob = await baixarRelatorioXlsxUBS();
+      const blob = await baixarRelatorioXlsxUBS({
+        data_inicio: dataInicio || undefined,
+        data_fim: dataFim || undefined,
+        categoria: valorFiltro(categoriaFiltro, "TODOS"),
+        status: valorFiltro(statusFiltro, "TODOS"),
+        agente_id: agenteFiltro,
+      });
 
       baixarBlob(blob, "notificacoes_ubs.xlsx");
     } catch (error) {
@@ -112,32 +136,6 @@ export default function NotificacoesUBSScreen() {
     carregarNotificacoes();
   }, [carregarNotificacoes]);
 
-  const mesesDisponiveis = useMemo(() => {
-    const meses = new Map<string, string>();
-
-    notificacoes.forEach((item) => {
-      if (!item.data_ocorrencia) return;
-
-      const data = new Date(item.data_ocorrencia);
-      if (Number.isNaN(data.getTime())) return;
-
-      const chave = `${data.getFullYear()}-${String(
-        data.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      const nomeMes = data.toLocaleDateString("pt-BR", {
-        month: "long",
-        year: "numeric",
-      });
-
-      meses.set(chave, nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1));
-    });
-
-    return Array.from(meses, ([valor, nome]) => ({ valor, nome })).sort(
-      (a, b) => b.valor.localeCompare(a.valor),
-    );
-  }, [notificacoes]);
-
   const agentes = useMemo(() => {
     const mapa = new Map<number, string>();
 
@@ -155,50 +153,15 @@ export default function NotificacoesUBSScreen() {
     );
   }, [notificacoes]);
 
-  const normalizar = (valor?: string | null) =>
-    (valor ?? "")
-      .trim()
-      .toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-
   const notificacoesFiltradas = useMemo(() => {
-    let resultado = notificacoes;
-
-    // Filtro por categoria ou status
-    if (filtro === "EM INVESTIGAÇÃO") {
-      resultado = resultado.filter(
-        (item) => normalizar(item.status) === normalizar(filtro),
-      );
-    } else if (filtro !== "Todos") {
-      resultado = resultado.filter(
-        (item) => normalizar(item.categoria) === normalizar(filtro),
-      );
-    }
-
-    // Filtro por agente
-    if (agenteFiltro !== null) {
-      resultado = resultado.filter(
-        (item) => Number(item.acs_ace_id) === agenteFiltro,
-      );
-    }
-    if (mesFiltro !== "Todos os meses") {
-      resultado = resultado.filter((item) => {
-        if (!item.data_ocorrencia) return false;
-
-        const data = new Date(item.data_ocorrencia);
-
-        if (Number.isNaN(data.getTime())) return false;
-
-        const chave = `${data.getFullYear()}-${String(
-          data.getMonth() + 1,
-        ).padStart(2, "0")}`;
-
-        return chave === mesFiltro;
-      });
-    }
-    return resultado;
-  }, [notificacoes, filtro, agenteFiltro, mesFiltro]);
+    return notificacoes.filter(
+      (item) =>
+        correspondeCategoria(item.categoria, categoriaFiltro) &&
+        correspondeStatus(item.status, statusFiltro) &&
+        (agenteFiltro === null || Number(item.acs_ace_id) === agenteFiltro) &&
+        dentroDoPeriodo(item.data_ocorrencia, dataInicio, dataFim),
+    );
+  }, [notificacoes, categoriaFiltro, statusFiltro, agenteFiltro, dataInicio, dataFim]);
 
   const renderNotificacao = ({ item }: { item: NotificacaoUBS }) => {
     const categoriaStyle = getCategoriaStyle(item.categoria);
@@ -238,7 +201,7 @@ export default function NotificacoesUBSScreen() {
 
         {/* Data + tipo */}
         <Text style={styles.metadata}>
-          {formatarData(item.data_envio)} • {item.tipo_evento}
+          {formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })} • {item.tipo_evento}
         </Text>
 
         {/* Local + afetados */}
@@ -280,6 +243,112 @@ export default function NotificacoesUBSScreen() {
     );
   };
 
+  const filtrosHeader = (
+    <View style={styles.filtersBlock}>
+      <View style={styles.agentFilterContainer}>
+        <Pressable
+          style={[
+            styles.agentFilterButton,
+            agenteFiltro !== null && styles.agentFilterButtonSelected,
+          ]}
+          onPress={() => setMostrarOpcoesAgentes((anterior) => !anterior)}
+        >
+          <Feather
+            name="filter"
+            size={16}
+            color={agenteFiltro !== null ? Colors.white : Colors.teal800}
+          />
+
+          <Text
+            style={[
+              styles.agentFilterButtonText,
+              agenteFiltro !== null && styles.agentFilterButtonTextSelected,
+            ]}
+            numberOfLines={1}
+          >
+            {agenteFiltro === null
+              ? "Agentes"
+              : (agentes.find((agente) => agente.id === agenteFiltro)?.nome ??
+                "Agentes")}
+          </Text>
+
+          <Feather
+            name={mostrarOpcoesAgentes ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={agenteFiltro !== null ? Colors.white : Colors.teal800}
+          />
+        </Pressable>
+
+        {mostrarOpcoesAgentes && (
+          <View style={styles.agentDropdown}>
+            <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+              {[
+                { id: null as number | null, nome: "Todos os agentes" },
+                ...agentes,
+              ].map((agente) => {
+                const selecionado = agenteFiltro === agente.id;
+
+                return (
+                  <Pressable
+                    key={agente.id === null ? "todos" : agente.id.toString()}
+                    style={[
+                      styles.agentOption,
+                      selecionado && styles.agentOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setAgenteFiltro(agente.id);
+                      setMostrarOpcoesAgentes(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.agentOptionText,
+                        selecionado && styles.agentOptionTextSelected,
+                      ]}
+                    >
+                      {agente.nome}
+                    </Text>
+
+                    {selecionado && (
+                      <Feather
+                        name="check"
+                        size={16}
+                        color={Colors.teal800}
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      <DateRangeFilter
+        inicio={dataInicio}
+        fim={dataFim}
+        onChange={(inicio, fim) => {
+          setDataInicio(inicio);
+          setDataFim(fim);
+        }}
+      />
+
+      <FilterChipGroup
+        label="Categoria"
+        options={CATEGORIAS_FILTRO}
+        selected={categoriaFiltro}
+        onSelect={setCategoriaFiltro}
+      />
+
+      <FilterChipGroup
+        label="Status"
+        options={STATUS_FILTRO}
+        selected={statusFiltro}
+        onSelect={setStatusFiltro}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal800} />
@@ -300,167 +369,6 @@ export default function NotificacoesUBSScreen() {
           onPress={handleExportarTodas}
           loading={exportando}
         />
-      </View>
-
-      {/* FILTROS */}
-      <View style={styles.filterContainer}>
-        <FlatList
-          horizontal
-          data={filtros}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-          renderItem={({ item }) => {
-            const selected = filtro === item;
-
-            return (
-              <Pressable
-                onPress={() => setFiltro(item)}
-                style={[
-                  styles.filterButton,
-                  selected && styles.filterButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selected && styles.filterTextSelected,
-                    isSmallScreen && styles.filterTextSmall,
-                  ]}
-                >
-                  {item === "Todos" ? "Todos" : formatarCategoria(item)}
-                </Text>
-              </Pressable>
-            );
-          }}
-        />
-
-        <View style={styles.agentFilterContainer}>
-          <Pressable
-            style={[
-              styles.agentFilterButton,
-              agenteFiltro !== null && styles.agentFilterButtonSelected,
-            ]}
-            onPress={() => setMostrarOpcoesAgentes((anterior) => !anterior)}
-          >
-            <Feather
-              name="filter"
-              size={16}
-              color={agenteFiltro !== null ? Colors.white : Colors.teal800}
-            />
-
-            <Text
-              style={[
-                styles.agentFilterButtonText,
-                agenteFiltro !== null && styles.agentFilterButtonTextSelected,
-              ]}
-              numberOfLines={1}
-            >
-              {agenteFiltro === null
-                ? "Agentes"
-                : (agentes.find((agente) => agente.id === agenteFiltro)?.nome ??
-                  "Agentes")}
-            </Text>
-
-            <Feather
-              name={mostrarOpcoesAgentes ? "chevron-up" : "chevron-down"}
-              size={16}
-              color={agenteFiltro !== null ? Colors.white : Colors.teal800}
-            />
-          </Pressable>
-
-          {mostrarOpcoesAgentes && (
-            <View style={styles.agentDropdown}>
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
-                {[
-                  { id: null as number | null, nome: "Todos os agentes" },
-                  ...agentes,
-                ].map((agente) => {
-                  const selecionado = agenteFiltro === agente.id;
-
-                  return (
-                    <Pressable
-                      key={agente.id === null ? "todos" : agente.id.toString()}
-                      style={[
-                        styles.agentOption,
-                        selecionado && styles.agentOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setAgenteFiltro(agente.id);
-                        setMostrarOpcoesAgentes(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.agentOptionText,
-                          selecionado && styles.agentOptionTextSelected,
-                        ]}
-                      >
-                        {agente.nome}
-                      </Text>
-
-                      {selecionado && (
-                        <Feather
-                          name="check"
-                          size={16}
-                          color={Colors.teal800}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-        <View style={styles.monthFilterContainer}>
-          <Pressable
-            style={styles.agentFilterButton}
-            onPress={() => setMostrarOpcoesMes((visivel) => !visivel)}
-          >
-            <Feather name="calendar" size={16} color={Colors.gray400} />
-
-            <Text style={styles.agentDropdownText}>
-              {mesFiltro === "Todos os meses"
-                ? "Todos os meses"
-                : (mesesDisponiveis.find((mes) => mes.valor === mesFiltro)
-                    ?.nome ?? "Todos os meses")}
-            </Text>
-
-            <Feather
-              name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
-              size={16}
-              color={Colors.gray400}
-            />
-          </Pressable>
-
-          {mostrarOpcoesMes && (
-            <View style={styles.agentDropdown}>
-              <Pressable
-                style={styles.agentOption}
-                onPress={() => {
-                  setMesFiltro("Todos os meses");
-                  setMostrarOpcoesMes(false);
-                }}
-              >
-                <Text>Todos os meses</Text>
-              </Pressable>
-
-              {mesesDisponiveis.map((mes) => (
-                <Pressable
-                  key={mes.valor}
-                  style={styles.agentOption}
-                  onPress={() => {
-                    setMesFiltro(mes.valor);
-                    setMostrarOpcoesMes(false);
-                  }}
-                >
-                  <Text>{mes.nome}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
       </View>
 
       {/* CONTEÚDO */}
@@ -486,6 +394,7 @@ export default function NotificacoesUBSScreen() {
           renderItem={renderNotificacao}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={filtrosHeader}
           ItemSeparatorComponent={() => (
             <View
               style={{
@@ -820,6 +729,11 @@ function NotificacaoUBSDetailModal({
                 />
 
                 <DetailRow
+                  label="Data da ocorrência"
+                  value={formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
+                />
+
+                <DetailRow
                   label="Local da ocorrência"
                   value={item.local_ocorrencia || "Não informado"}
                 />
@@ -888,31 +802,6 @@ function NotificacaoUBSDetailModal({
 /* =========================================================
    HELPERS
 ========================================================= */
-
-function formatarData(data: string) {
-  if (!data) {
-    return "Data não informada";
-  }
-
-  const date = new Date(data);
-
-  if (Number.isNaN(date.getTime())) {
-    return data;
-  }
-
-  return (
-    date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }) +
-    " • " +
-    date.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  );
-}
 
 function formatarAfetados(quantidade: number, categoria: string) {
   if (categoria === "EPIZOOTIA") {
@@ -1078,10 +967,8 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  filterContainer: {
-    backgroundColor: "#F4F8F7",
-    paddingTop: Spacing.md,
-    paddingBottom: 4,
+  filtersBlock: {
+    marginBottom: Spacing.md,
   },
 
   detailSectionLabel: {
@@ -1122,26 +1009,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  filterContent: {
-    paddingHorizontal: Spacing.md,
-    gap: 10,
-  },
-
-  filterButton: {
-    height: 36,
-    paddingHorizontal: 17,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#D5E2DF",
-    backgroundColor: Colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
   agentFilterContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.md,
     position: "relative",
     zIndex: 10,
   },
@@ -1204,13 +1073,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#E5EEEB",
   },
-  monthFilterContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.sm,
-    position: "relative",
-    zIndex: 9,
-  },
 
   monthFilterButtonSelected: {
     backgroundColor: Colors.teal800,
@@ -1243,38 +1105,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  filterButtonSelected: {
-    backgroundColor: Colors.teal800,
-    borderColor: Colors.teal800,
-  },
-
-  filterText: {
-    fontSize: FontSize.sm,
-    color: Colors.gray600,
-    fontWeight: "500",
-  },
-
-  filterTextSelected: {
-    color: Colors.white,
-    fontWeight: "700",
-  },
-
-  filterTextSmall: {
-    fontSize: 12,
-  },
-
   agentFilterTitle: {
     fontSize: FontSize.sm,
     fontWeight: "600",
     color: Colors.gray600,
     marginBottom: Spacing.sm,
-  },
-
-  agentDropdownText: {
-    flex: 1,
-    fontSize: FontSize.md,
-    color: Colors.gray800,
-    marginRight: Spacing.sm,
   },
 
   agentModalOverlay: {

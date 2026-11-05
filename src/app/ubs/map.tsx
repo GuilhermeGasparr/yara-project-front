@@ -1,4 +1,6 @@
 import WebMap from "@/app/agente/WebMap";
+import { DateRangeFilter } from "@/components/filters/DateRangeFilter";
+import { dentroDoPeriodo } from "@/utils/filtros";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -33,9 +35,10 @@ export default function UbsMapScreen() {
 
   const [filter, setFilter] = useState("Todos");
   const [loading, setLoading] = useState(true);
-  const [monthDropdownVisible, setMonthDropdownVisible] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacaoUBS[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState("Todos os meses");
+  // Período (YYYY-MM-DD); vazio = sem limite
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [region, setRegion] = useState({
     latitude: -3.7319,
     longitude: -38.5267,
@@ -90,49 +93,19 @@ export default function UbsMapScreen() {
 
     return COLORS.doenca;
   }
-  const mesesDisponiveis = Array.from(
-    new Set(
-      notificacoes
-        .filter((item) => item.data_envio)
-        .map((item) => {
-          const date = new Date(item.data_envio);
 
-          if (Number.isNaN(date.getTime())) return null;
-
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-            2,
-            "0",
-          )}`;
-        })
-        .filter((mes): mes is string => mes !== null),
-    ),
-  ).sort((a, b) => b.localeCompare(a));
-
-  function formatMonthLabel(monthKey: string) {
-    const [year, month] = monthKey.split("-").map(Number);
-
-    const label = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {
-      month: "long",
-      year: "numeric",
-    });
-
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }
   const filteredNotificacoes = notificacoes.filter((item) => {
     const correspondeCategoria =
       filter === "Todos" ||
       item.categoria?.toUpperCase().includes(filter.toUpperCase());
 
-    const date = new Date(item.data_envio);
+    const correspondeData = dentroDoPeriodo(
+      item.data_ocorrencia,
+      dataInicio,
+      dataFim,
+    );
 
-    const mesNotificacao = Number.isNaN(date.getTime())
-      ? ""
-      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-
-    const correspondeMes =
-      selectedMonth === "Todos os meses" || mesNotificacao === selectedMonth;
-
-    return correspondeCategoria && correspondeMes;
+    return correspondeCategoria && correspondeData;
   });
 
   function formatDate(dateStr: string) {
@@ -194,69 +167,16 @@ export default function UbsMapScreen() {
             );
           })}
         </ScrollView>
-        <View style={styles.monthFilterContainer}>
-          <TouchableOpacity
-            style={styles.monthFilterButton}
-            onPress={() => setMonthDropdownVisible(!monthDropdownVisible)}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={17}
-              color={COLORS.primaryHeader}
-            />
-
-            <Text style={styles.monthFilterText}>
-              {selectedMonth === "Todos os meses"
-                ? "Todos os meses"
-                : formatMonthLabel(selectedMonth)}
-            </Text>
-
-            <Ionicons
-              name={monthDropdownVisible ? "chevron-up" : "chevron-down"}
-              size={16}
-              color={COLORS.textGray}
-            />
-          </TouchableOpacity>
-
-          {monthDropdownVisible && (
-            <View style={styles.monthDropdown}>
-              {["Todos os meses", ...mesesDisponiveis].map((mes) => {
-                const isSelected = selectedMonth === mes;
-
-                return (
-                  <TouchableOpacity
-                    key={mes}
-                    style={[
-                      styles.monthOption,
-                      isSelected && styles.monthOptionSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedMonth(mes);
-                      setMonthDropdownVisible(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.monthOptionText,
-                        isSelected && styles.monthOptionTextSelected,
-                      ]}
-                    >
-                      {mes === "Todos os meses" ? mes : formatMonthLabel(mes)}
-                    </Text>
-
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color={COLORS.primaryHeader}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
+        {/* Período */}
+        <View style={styles.dateFilterContainer}>
+          <DateRangeFilter
+            inicio={dataInicio}
+            fim={dataFim}
+            onChange={(inicio, fim) => {
+              setDataInicio(inicio);
+              setDataFim(fim);
+            }}
+          />
         </View>
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
@@ -417,71 +337,7 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "relative",
   },
-  monthFilterContainer: {
-    marginHorizontal: 16,
-    marginTop: 0,
-    marginBottom: 12,
-    alignSelf: "flex-start",
-    minWidth: 190,
-    zIndex: 10,
-  },
 
-  monthFilterButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 10,
-  },
-
-  monthFilterText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.textDark,
-  },
-
-  monthDropdown: {
-    marginTop: 4,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-  },
-
-  monthOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-
-  monthOptionSelected: {
-    backgroundColor: "#F0F7F3",
-  },
-
-  monthOptionText: {
-    fontSize: 13,
-    color: COLORS.textDark,
-  },
-
-  monthOptionTextSelected: {
-    color: COLORS.primaryHeader,
-    fontWeight: "600",
-  },
   legendContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -551,5 +407,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     padding: 20,
     color: COLORS.textGray,
+  },
+
+  dateFilterContainer: {
+    marginHorizontal: 16,
+    zIndex: 10,
   },
 });

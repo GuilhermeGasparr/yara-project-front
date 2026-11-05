@@ -1,4 +1,5 @@
 import { AllNotificationsButton } from "@/components/AllNotificationsButton";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { DeleteNotificationButton } from "@/components/DeleteNotificationButton";
 import { NotificationRow } from "@/components/NotificationRow";
@@ -597,6 +598,13 @@ function NotificacaoDetailModal({
                 />
 
                 <DetailRow
+                  label="Data da ocorrência"
+                  value={formatarDataOcorrencia(item.data_ocorrencia, {
+                    comAno: true,
+                  })}
+                />
+
+                <DetailRow
                   label="Local da ocorrência"
                   value={item.local_ocorrencia || "Não informado"}
                 />
@@ -916,15 +924,6 @@ export default function UbsHomeScreen() {
           style={styles.primaryBtn}
         />
 
-        <View style={styles.gridRow}>
-          <QuickActionButton
-            label="Notificações"
-            sublabel="Ver todas as ocorrências"
-            icon={<BellIcon />}
-            onPress={() => router.navigate("/ubs/notificacoes")}
-            style={styles.gridItem}
-          />
-        </View>
         <View style={styles.gridRow}>
           <QuickActionButton
             label="Notificações"
