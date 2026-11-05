@@ -32,7 +32,19 @@ import {
   baixarRelatorioXlsxVE,
 } from "@/services/VeService";
 import { baixarBlob } from "@/utils/downloadFile";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { ExportHeaderButton } from "@/components/ExportHeaderButton";
+import { DateRangeFilter } from "@/components/filters/DateRangeFilter";
+import { FilterChipGroup } from "@/components/filters/FilterChipGroup";
+import {
+  CATEGORIAS_FILTRO,
+  STATUS_FILTRO,
+  correspondeCategoria,
+  correspondeStatus,
+  dentroDoPeriodo,
+  periodoInvalido,
+  valorFiltro,
+} from "@/utils/filtros";
 
 import type { Notificacao } from "@/services/NotificationService";
 
@@ -143,22 +155,6 @@ function getCategoriaStyle(categoria: string) {
   }
 }
 
-function formatarData(data: string) {
-  if (!data) return "Data não informada";
-
-  const date = new Date(data);
-
-  if (Number.isNaN(date.getTime())) {
-    return data;
-  }
-
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 function formatarAfetados(quantidade: number, categoria: string) {
   if (normalizar(categoria) === "EPIZOOTIA") {
     return `${quantidade} animais afetados`;
@@ -204,7 +200,7 @@ function NotificationCard({ item, onPress }: NotificationCardProps) {
             </Text>
 
             <Text style={styles.cardMeta}>
-              {formatarData(item.data_envio)} ·{" "}
+              {formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })} ·{" "}
               {item.municipio || "Município não informado"}
             </Text>
           </View>
@@ -495,6 +491,10 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
               <DetailRow label="Tipo de evento" value={item.tipo_evento} />
               <DetailRow label="Categoria" value={item.categoria} />
               <DetailRow label="Data de envio" value={dataFormatada} />
+              <DetailRow
+                label="Data da ocorrência"
+                value={formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
+              />
               <DetailRow label="Estado" value={item.estado ?? ""} />
               <DetailRow label="Município" value={item.municipio ?? ""} />
               <DetailRow
@@ -547,6 +547,93 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
   );
 }
 
+type DropdownAberto = "SUPERINTENDENCIA" | "COADS" | null;
+
+interface DropdownFilterProps {
+  label: string;
+  todasLabel: string;
+  valor: string;
+  opcoes: string[];
+  aberto: boolean;
+  onToggle: () => void;
+  onSelect: (valor: string) => void;
+}
+
+/** Lista suspensa com opção "Todas" (valor "TODAS"), usada em COADS e Superintendência. */
+function DropdownFilter({
+  label,
+  todasLabel,
+  valor,
+  opcoes,
+  aberto,
+  onToggle,
+  onSelect,
+}: DropdownFilterProps) {
+  const ativo = valor !== "TODAS";
+
+  return (
+    <View style={styles.coadsFilterContainer}>
+      <Text style={styles.filterLabel}>{label}</Text>
+
+      <Pressable
+        style={[styles.coadsButton, ativo && styles.coadsButtonActive]}
+        onPress={onToggle}
+      >
+        <Text
+          style={[styles.coadsButtonText, ativo && styles.coadsButtonTextActive]}
+          numberOfLines={1}
+        >
+          {ativo ? valor : todasLabel}
+        </Text>
+
+        <Feather
+          name={aberto ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={ativo ? Colors.white : Colors.teal600}
+        />
+      </Pressable>
+
+      {aberto && (
+        <View style={styles.coadsDropdown}>
+          <ScrollView
+            nestedScrollEnabled
+            style={styles.coadsDropdownScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {["TODAS", ...opcoes].map((opcao) => {
+              const selecionada = valor === opcao;
+
+              return (
+                <Pressable
+                  key={opcao}
+                  style={[
+                    styles.coadsOption,
+                    selecionada && styles.coadsOptionSelected,
+                  ]}
+                  onPress={() => onSelect(opcao)}
+                >
+                  <Text
+                    style={[
+                      styles.coadsOptionText,
+                      selecionada && styles.coadsOptionTextSelected,
+                    ]}
+                  >
+                    {opcao === "TODAS" ? todasLabel : opcao}
+                  </Text>
+
+                  {selecionada && (
+                    <Feather name="check" size={16} color={Colors.teal600} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function EstadualNotificationsScreen() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -555,12 +642,13 @@ export default function EstadualNotificationsScreen() {
   const [categoriaFiltro, setCategoriaFiltro] = useState("TODOS");
   const [statusFiltro, setStatusFiltro] = useState("TODOS");
 
+  const [superintendenciaFiltro, setSuperintendenciaFiltro] = useState("TODAS");
   const [coadsFiltro, setCoadsFiltro] = useState("TODAS");
-  const [mostrarOpcoesCoads, setMostrarOpcoesCoads] = useState(false);
+  const [dropdownAberto, setDropdownAberto] = useState<DropdownAberto>(null);
 
-  // Estados do Filtro por Mês
-  const [mesFiltro, setMesFiltro] = useState("TODOS");
-  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+  // Período (YYYY-MM-DD); vazio = sem limite
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
   const [selectedNotification, setSelectedNotification] =
     useState<Notificacao | null>(null);
@@ -570,10 +658,25 @@ export default function EstadualNotificationsScreen() {
   async function handleExportarTodas() {
     if (exportandoTodas) return;
 
+    if (periodoInvalido(dataInicio, dataFim)) {
+      Alert.alert(
+        "Período inválido",
+        "A data início não pode ser posterior à data fim.",
+      );
+      return;
+    }
+
     try {
       setExportandoTodas(true);
 
-      const blob = await baixarRelatorioXlsxVE();
+      const blob = await baixarRelatorioXlsxVE({
+        data_inicio: dataInicio || undefined,
+        data_fim: dataFim || undefined,
+        categoria: valorFiltro(categoriaFiltro, "TODOS"),
+        status: valorFiltro(statusFiltro, "TODOS"),
+        coads: valorFiltro(coadsFiltro, "TODAS"),
+        superintendencia: valorFiltro(superintendenciaFiltro, "TODAS"),
+      });
 
       baixarBlob(blob, "notificacoes_estadual.xlsx");
     } catch (error) {
@@ -611,69 +714,51 @@ export default function EstadualNotificationsScreen() {
     fetchData();
   }, [fetchData]);
 
-  const coadsDisponiveis = useMemo(() => {
+  const superintendenciasDisponiveis = useMemo(() => {
     return [
       ...new Set(
         notificacoes
-          .map((item) => item.coads?.trim())
-          .filter((coads): coads is string => Boolean(coads)),
+          .map((item) => item.superintendencia?.trim())
+          .filter((nome): nome is string => Boolean(nome)),
       ),
     ].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [notificacoes]);
 
-  // Meses disponíveis extraídos das notificações
-  const mesesDisponiveis = useMemo(() => {
-    const meses = new Map<string, string>();
+  // Com uma superintendência escolhida, só as COADS dela aparecem
+  const coadsPorSuperintendencia = useCallback(
+    (superintendencia: string) => {
+      return [
+        ...new Set(
+          notificacoes
+            .filter(
+              (item) =>
+                superintendencia === "TODAS" ||
+                normalizar(item.superintendencia) ===
+                  normalizar(superintendencia),
+            )
+            .map((item) => item.coads?.trim())
+            .filter((coads): coads is string => Boolean(coads)),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    },
+    [notificacoes],
+  );
 
-    notificacoes.forEach((item) => {
-      if (!item.data_envio) return;
+  const coadsDisponiveis = useMemo(
+    () => coadsPorSuperintendencia(superintendenciaFiltro),
+    [coadsPorSuperintendencia, superintendenciaFiltro],
+  );
 
-      const data = new Date(item.data_envio);
+  function selecionarSuperintendencia(superintendencia: string) {
+    setSuperintendenciaFiltro(superintendencia);
+    setDropdownAberto(null);
 
-      if (Number.isNaN(data.getTime())) return;
-
-      const valor = `${data.getFullYear()}-${String(
-        data.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      const nome = data.toLocaleDateString("pt-BR", {
-        month: "long",
-        year: "numeric",
-      });
-
-      meses.set(valor, nome.charAt(0).toUpperCase() + nome.slice(1));
-    });
-
-    return Array.from(meses, ([valor, nome]) => ({
-      valor,
-      nome,
-    })).sort((a, b) => b.valor.localeCompare(a.valor));
-  }, [notificacoes]);
-
-  function normalizarStatusFiltro(status?: string) {
-    const valor = normalizar(status);
-
-    switch (valor) {
-      case "PENDENTE":
-      case "EM ANDAMENTO":
-        return "PENDENTE";
-
-      case "EM INVESTIGACAO":
-        return "EM INVESTIGACAO";
-
-      case "VERIDICO":
-      case "CONFIRMADO":
-        return "VERIDICO";
-
-      case "NAO VERIDICO":
-      case "DESCARTADO":
-        return "NAO VERIDICO";
-
-      case "ENCERRADO":
-        return "ENCERRADO";
-
-      default:
-        return valor;
+    // A COADS escolhida some da lista se não for da nova superintendência
+    if (
+      coadsFiltro !== "TODAS" &&
+      !coadsPorSuperintendencia(superintendencia).includes(coadsFiltro)
+    ) {
+      setCoadsFiltro("TODAS");
     }
   }
 
@@ -681,57 +766,43 @@ export default function EstadualNotificationsScreen() {
     const buscaNormalizada = normalizar(busca);
 
     return notificacoes.filter((item) => {
-      const categoria = normalizar(item.categoria);
-      const status = normalizarStatusFiltro(item.status);
-
       const textoBusca = normalizar(
         `${item.tipo_evento} ${item.municipio ?? ""} ${
           item.nome ?? ""
         } ${item.id}`,
       );
 
+      const correspondeBusca =
+        !buscaNormalizada || textoBusca.includes(buscaNormalizada);
+
+      const correspondeSuperintendencia =
+        superintendenciaFiltro === "TODAS" ||
+        normalizar(item.superintendencia) ===
+          normalizar(superintendenciaFiltro);
+
       const correspondeCoads =
         coadsFiltro === "TODAS" ||
         normalizar(item.coads) === normalizar(coadsFiltro);
 
-      // Filtro por Mês
-      let correspondeMes = true;
-      if (mesFiltro !== "TODOS") {
-        if (!item.data_envio) {
-          correspondeMes = false;
-        } else {
-          const data = new Date(item.data_envio);
-          if (Number.isNaN(data.getTime())) {
-            correspondeMes = false;
-          } else {
-            const valorMes = `${data.getFullYear()}-${String(
-              data.getMonth() + 1,
-            ).padStart(2, "0")}`;
-            correspondeMes = valorMes === mesFiltro;
-          }
-        }
-      }
-
-      const correspondeBusca =
-        !buscaNormalizada || textoBusca.includes(buscaNormalizada);
-
-      const correspondeCategoria =
-        categoriaFiltro === "TODOS" ||
-        categoria === normalizar(categoriaFiltro);
-
-      const correspondeStatus =
-        statusFiltro === "TODOS" ||
-        status === normalizarStatusFiltro(statusFiltro);
-
       return (
         correspondeBusca &&
-        correspondeCategoria &&
-        correspondeStatus &&
+        correspondeCategoria(item.categoria, categoriaFiltro) &&
+        correspondeStatus(item.status, statusFiltro) &&
+        correspondeSuperintendencia &&
         correspondeCoads &&
-        correspondeMes
+        dentroDoPeriodo(item.data_ocorrencia, dataInicio, dataFim)
       );
     });
-  }, [notificacoes, busca, categoriaFiltro, statusFiltro, coadsFiltro, mesFiltro]);
+  }, [
+    notificacoes,
+    busca,
+    categoriaFiltro,
+    statusFiltro,
+    superintendenciaFiltro,
+    coadsFiltro,
+    dataInicio,
+    dataFim,
+  ]);
 
   return (
     <View style={styles.screen}>
@@ -788,257 +859,62 @@ export default function EstadualNotificationsScreen() {
           )}
         </View>
 
-        {/* Filtro de COADS */}
-        <View style={styles.coadsFilterContainer}>
-          <Text style={styles.filterLabel}>COADS</Text>
+        {/* Superintendência */}
+        <DropdownFilter
+          label="Superintendência"
+          todasLabel="Todas as superintendências"
+          valor={superintendenciaFiltro}
+          opcoes={superintendenciasDisponiveis}
+          aberto={dropdownAberto === "SUPERINTENDENCIA"}
+          onToggle={() =>
+            setDropdownAberto((atual) =>
+              atual === "SUPERINTENDENCIA" ? null : "SUPERINTENDENCIA",
+            )
+          }
+          onSelect={selecionarSuperintendencia}
+        />
 
-          <Pressable
-            style={[
-              styles.coadsButton,
-              coadsFiltro !== "TODAS" && styles.coadsButtonActive,
-            ]}
-            onPress={() => {
-              setMostrarOpcoesCoads((anterior) => !anterior);
-              setMostrarOpcoesMes(false);
-            }}
-          >
-            <Text
-              style={[
-                styles.coadsButtonText,
-                coadsFiltro !== "TODAS" && styles.coadsButtonTextActive,
-              ]}
-              numberOfLines={1}
-            >
-              {coadsFiltro === "TODAS" ? "Todas as COADS" : coadsFiltro}
-            </Text>
+        {/* COADS */}
+        <DropdownFilter
+          label="COADS"
+          todasLabel="Todas as COADS"
+          valor={coadsFiltro}
+          opcoes={coadsDisponiveis}
+          aberto={dropdownAberto === "COADS"}
+          onToggle={() =>
+            setDropdownAberto((atual) => (atual === "COADS" ? null : "COADS"))
+          }
+          onSelect={(coads) => {
+            setCoadsFiltro(coads);
+            setDropdownAberto(null);
+          }}
+        />
 
-            <Feather
-              name={mostrarOpcoesCoads ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={coadsFiltro !== "TODAS" ? Colors.white : Colors.teal600}
-            />
-          </Pressable>
-
-          {mostrarOpcoesCoads && (
-            <View style={styles.coadsDropdown}>
-              <ScrollView
-                nestedScrollEnabled
-                style={styles.coadsDropdownScroll}
-                keyboardShouldPersistTaps="handled"
-              >
-                {["TODAS", ...coadsDisponiveis].map((coads) => {
-                  const selecionada = coadsFiltro === coads;
-
-                  return (
-                    <Pressable
-                      key={coads}
-                      style={[
-                        styles.coadsOption,
-                        selecionada && styles.coadsOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setCoadsFiltro(coads);
-                        setMostrarOpcoesCoads(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.coadsOptionText,
-                          selecionada && styles.coadsOptionTextSelected,
-                        ]}
-                      >
-                        {coads === "TODAS" ? "Todas as COADS" : coads}
-                      </Text>
-
-                      {selecionada && (
-                        <Feather
-                          name="check"
-                          size={16}
-                          color={Colors.teal600}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-
-        {/* Filtro de MÊS (Abaixo de COADS) */}
-        <View style={styles.coadsFilterContainer}>
-          <Text style={styles.filterLabel}>Mês</Text>
-
-          <Pressable
-            style={[
-              styles.coadsButton,
-              mesFiltro !== "TODOS" && styles.coadsButtonActive,
-            ]}
-            onPress={() => {
-              setMostrarOpcoesMes((anterior) => !anterior);
-              setMostrarOpcoesCoads(false);
-            }}
-          >
-            <Text
-              style={[
-                styles.coadsButtonText,
-                mesFiltro !== "TODOS" && styles.coadsButtonTextActive,
-              ]}
-              numberOfLines={1}
-            >
-              {mesFiltro === "TODOS"
-                ? "Todos os meses"
-                : mesesDisponiveis.find((m) => m.valor === mesFiltro)?.nome ||
-                  mesFiltro}
-            </Text>
-
-            <Feather
-              name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={mesFiltro !== "TODOS" ? Colors.white : Colors.teal600}
-            />
-          </Pressable>
-
-          {mostrarOpcoesMes && (
-            <View style={styles.coadsDropdown}>
-              <ScrollView
-                nestedScrollEnabled
-                style={styles.coadsDropdownScroll}
-                keyboardShouldPersistTaps="handled"
-              >
-                <Pressable
-                  style={[
-                    styles.coadsOption,
-                    mesFiltro === "TODOS" && styles.coadsOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setMesFiltro("TODOS");
-                    setMostrarOpcoesMes(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.coadsOptionText,
-                      mesFiltro === "TODOS" && styles.coadsOptionTextSelected,
-                    ]}
-                  >
-                    Todos os meses
-                  </Text>
-
-                  {mesFiltro === "TODOS" && (
-                    <Feather name="check" size={16} color={Colors.teal600} />
-                  )}
-                </Pressable>
-
-                {mesesDisponiveis.map((mes) => {
-                  const selecionada = mesFiltro === mes.valor;
-
-                  return (
-                    <Pressable
-                      key={mes.valor}
-                      style={[
-                        styles.coadsOption,
-                        selecionada && styles.coadsOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setMesFiltro(mes.valor);
-                        setMostrarOpcoesMes(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.coadsOptionText,
-                          selecionada && styles.coadsOptionTextSelected,
-                        ]}
-                      >
-                        {mes.nome}
-                      </Text>
-
-                      {selecionada && (
-                        <Feather
-                          name="check"
-                          size={16}
-                          color={Colors.teal600}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-        </View>
+        {/* Período */}
+        <DateRangeFilter
+          inicio={dataInicio}
+          fim={dataFim}
+          onChange={(inicio, fim) => {
+            setDataInicio(inicio);
+            setDataFim(fim);
+          }}
+        />
 
         {/* Categorias */}
-        <Text style={styles.filterLabel}>Categoria</Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
-          {["TODOS", "DOENÇA", "EPIZOOTIA", "DESASTRE"].map((filtro) => {
-            const active = categoriaFiltro === filtro;
-
-            return (
-              <TouchableOpacity
-                key={filtro}
-                onPress={() => setCategoriaFiltro(filtro)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
-                  ]}
-                >
-                  {filtro === "TODOS" ? "Todos" : filtro}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <FilterChipGroup
+          label="Categoria"
+          options={CATEGORIAS_FILTRO}
+          selected={categoriaFiltro}
+          onSelect={setCategoriaFiltro}
+        />
 
         {/* Status */}
-        <Text style={styles.filterLabel}>Status</Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
-          {[
-            "TODOS",
-            "PENDENTE",
-            "EM INVESTIGAÇÃO",
-            "VERÍDICO",
-            "NÃO VERÍDICO",
-            "ENCERRADO",
-          ].map((filtro) => {
-            const active = statusFiltro === filtro;
-
-            return (
-              <TouchableOpacity
-                key={filtro}
-                onPress={() => setStatusFiltro(filtro)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    active && styles.filterChipTextActive,
-                  ]}
-                >
-                  {filtro === "TODOS"
-                    ? "Todos"
-                    : filtro === "PENDENTE"
-                      ? "Pendentes"
-                      : formatarStatus(filtro)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <FilterChipGroup
+          label="Status"
+          options={STATUS_FILTRO}
+          selected={statusFiltro}
+          onSelect={setStatusFiltro}
+        />
 
         {/* Contador */}
         <View style={styles.resultsHeader}>
@@ -1178,35 +1054,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: Spacing.sm,
-  },
-
-  filterRow: {
-    gap: Spacing.sm,
-    paddingBottom: Spacing.md,
-  },
-
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray100,
-  },
-
-  filterChipActive: {
-    backgroundColor: Colors.teal600,
-    borderColor: Colors.teal600,
-  },
-
-  filterChipText: {
-    fontSize: FontSize.xs,
-    fontWeight: "600",
-    color: Colors.gray600,
-  },
-
-  filterChipTextActive: {
-    color: Colors.white,
   },
 
   exportButton: {

@@ -1,5 +1,6 @@
 import { getItem } from "@/utils/storage";
 import { normalizarNotificacoes } from "@/utils/status";
+import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 import type { Notificacao } from "./NotificationService";
 
 //const BASE_URL = "https://yara-project.onrender.com";
@@ -90,10 +91,14 @@ export async function baixarRelatorioNotificacaoXlsxRegional(
   return response.blob();
 }
 
-export async function exportarRelatorioRegionalXlsx(): Promise<Blob> {
+export async function exportarRelatorioRegionalXlsx(
+  filtros?: FiltrosRelatorio,
+): Promise<Blob> {
   const headers = await authHeader();
 
-  const response = await fetch(`${BASE_URL}/vr/exportar_relatorio/xlsx`, {
+  const url = `${BASE_URL}/vr/exportar_relatorio/xlsx${montarQueryRelatorio(filtros)}`;
+
+  const response = await fetch(url, {
     headers,
   });
 

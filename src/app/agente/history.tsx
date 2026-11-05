@@ -9,7 +9,6 @@ import {
   Alert,
   Text,
   View,
-  useWindowDimensions,
   TouchableOpacity,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -24,31 +23,53 @@ import {
   exportarRelatorioAgenteXlsx,
 } from "@/services/NotificationService";
 import { baixarBlob } from "@/utils/downloadFile";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { ExportHeaderButton } from "@/components/ExportHeaderButton";
-
-const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
+import { DateRangeFilter } from "@/components/filters/DateRangeFilter";
+import { FilterChipGroup } from "@/components/filters/FilterChipGroup";
+import {
+  CATEGORIAS_FILTRO,
+  STATUS_FILTRO,
+  correspondeCategoria,
+  correspondeStatus,
+  dentroDoPeriodo,
+  periodoInvalido,
+  valorFiltro,
+} from "@/utils/filtros";
 
 export default function HistoryScreen() {
-  const { width } = useWindowDimensions();
-  const [mesFiltro, setMesFiltro] = useState("Todos os meses");
-  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+  // Período (YYYY-MM-DD); vazio = sem limite
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [filtro, setFiltro] = useState("Todos");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("TODOS");
+  const [statusFiltro, setStatusFiltro] = useState("TODOS");
   const [selectedNotification, setSelectedNotification] =
     useState<Notificacao | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
 
-  const isSmallScreen = width < 380;
-
   async function handleExportarTodas() {
     if (exportando) return;
+
+    if (periodoInvalido(dataInicio, dataFim)) {
+      Alert.alert(
+        "Período inválido",
+        "A data início não pode ser posterior à data fim.",
+      );
+      return;
+    }
 
     try {
       setExportando(true);
 
-      const blob = await exportarRelatorioAgenteXlsx();
+      const blob = await exportarRelatorioAgenteXlsx({
+        data_inicio: dataInicio || undefined,
+        data_fim: dataFim || undefined,
+        categoria: valorFiltro(categoriaFiltro, "TODOS"),
+        status: valorFiltro(statusFiltro, "TODOS"),
+      });
 
       baixarBlob(blob, "notificacoes_agente.xlsx");
     } catch (error) {
@@ -89,62 +110,13 @@ export default function HistoryScreen() {
   }, [carregarNotificacoes]);
 
   const notificacoesFiltradas = useMemo(() => {
-    let resultado = notificacoes;
-
-    // Filtro por categoria ou status
-    if (filtro === "EM INVESTIGAÇÃO") {
-      resultado = resultado.filter((item) => item.status === "EM INVESTIGAÇÃO");
-    } else if (filtro !== "Todos") {
-      resultado = resultado.filter((item) => item.categoria === filtro);
-    }
-
-    // Filtro por mês
-    if (mesFiltro !== "Todos os meses") {
-      resultado = resultado.filter((item) => {
-        if (!item.data_envio) return false;
-
-        const data = new Date(item.data_envio);
-
-        if (Number.isNaN(data.getTime())) return false;
-
-        const valor = `${data.getFullYear()}-${String(
-          data.getMonth() + 1,
-        ).padStart(2, "0")}`;
-
-        return valor === mesFiltro;
-      });
-    }
-
-    return resultado;
-  }, [notificacoes, filtro, mesFiltro]);
-
-  const mesesDisponiveis = useMemo(() => {
-    const meses = new Map<string, string>();
-
-    notificacoes.forEach((item) => {
-      if (!item.data_envio) return;
-
-      const data = new Date(item.data_envio);
-
-      if (Number.isNaN(data.getTime())) return;
-
-      const valor = `${data.getFullYear()}-${String(
-        data.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      const nome = data.toLocaleDateString("pt-BR", {
-        month: "long",
-        year: "numeric",
-      });
-
-      meses.set(valor, nome.charAt(0).toUpperCase() + nome.slice(1));
-    });
-
-    return Array.from(meses, ([valor, nome]) => ({
-      valor,
-      nome,
-    })).sort((a, b) => b.valor.localeCompare(a.valor));
-  }, [notificacoes]);
+    return notificacoes.filter(
+      (item) =>
+        correspondeCategoria(item.categoria, categoriaFiltro) &&
+        correspondeStatus(item.status, statusFiltro) &&
+        dentroDoPeriodo(item.data_ocorrencia, dataInicio, dataFim),
+    );
+  }, [notificacoes, categoriaFiltro, statusFiltro, dataInicio, dataFim]);
 
   const renderNotificacao = ({ item }: { item: Notificacao }) => {
     const categoriaStyle = getCategoriaStyle(item.categoria);
@@ -186,7 +158,7 @@ export default function HistoryScreen() {
 
         {/* Data + tipo */}
         <Text style={styles.metadata}>
-          {formatarData(item.data_envio)} • {item.tipo_evento}
+          {formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })} • {item.tipo_evento}
         </Text>
 
         {/* Local + afetados */}
@@ -228,6 +200,33 @@ export default function HistoryScreen() {
     );
   };
 
+  const filtrosHeader = (
+    <View style={styles.filtersBlock}>
+      <DateRangeFilter
+        inicio={dataInicio}
+        fim={dataFim}
+        onChange={(inicio, fim) => {
+          setDataInicio(inicio);
+          setDataFim(fim);
+        }}
+      />
+
+      <FilterChipGroup
+        label="Categoria"
+        options={CATEGORIAS_FILTRO}
+        selected={categoriaFiltro}
+        onSelect={setCategoriaFiltro}
+      />
+
+      <FilterChipGroup
+        label="Status"
+        options={STATUS_FILTRO}
+        selected={statusFiltro}
+        onSelect={setStatusFiltro}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal800} />
@@ -250,129 +249,6 @@ export default function HistoryScreen() {
         />
       </View>
 
-      {/* FILTROS */}
-      {!selectedNotification && (
-        <>
-          <View style={styles.filterContainer}>
-            <FlatList
-              horizontal
-              data={filtros}
-              keyExtractor={(item) => item}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterContent}
-              renderItem={({ item }) => {
-                const selected = filtro === item;
-
-                return (
-                  <Pressable
-                    onPress={() => setFiltro(item)}
-                    style={[
-                      styles.filterButton,
-                      selected && styles.filterButtonSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.filterText,
-                        selected && styles.filterTextSelected,
-                        isSmallScreen && styles.filterTextSmall,
-                      ]}
-                    >
-                      {item === "Todos" ? "Todos" : formatarCategoria(item)}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
-          </View>
-          <View style={styles.monthFilterContainer}>
-            <Pressable
-              style={styles.monthFilterButton}
-              onPress={() => setMostrarOpcoesMes((visivel) => !visivel)}
-            >
-              <Feather name="calendar" size={16} color={Colors.teal800} />
-
-              <Text style={styles.monthFilterText} numberOfLines={1}>
-                {mesFiltro === "Todos os meses"
-                  ? "Todos os meses"
-                  : (mesesDisponiveis.find((mes) => mes.valor === mesFiltro)
-                      ?.nome ?? "Todos os meses")}
-              </Text>
-
-              <Feather
-                name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={Colors.teal800}
-              />
-            </Pressable>
-
-            {mostrarOpcoesMes && (
-              <View style={styles.monthDropdown}>
-                <Pressable
-                  style={[
-                    styles.monthOption,
-                    mesFiltro === "Todos os meses" &&
-                      styles.monthOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setMesFiltro("Todos os meses");
-                    setMostrarOpcoesMes(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.monthOptionText,
-                      mesFiltro === "Todos os meses" &&
-                        styles.monthOptionTextSelected,
-                    ]}
-                  >
-                    Todos os meses
-                  </Text>
-
-                  {mesFiltro === "Todos os meses" && (
-                    <Feather name="check" size={16} color={Colors.teal800} />
-                  )}
-                </Pressable>
-
-                {mesesDisponiveis.map((mes) => {
-                  const selecionado = mesFiltro === mes.valor;
-
-                  return (
-                    <Pressable
-                      key={mes.valor}
-                      style={[
-                        styles.monthOption,
-                        selecionado && styles.monthOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setMesFiltro(mes.valor);
-                        setMostrarOpcoesMes(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.monthOptionText,
-                          selecionado && styles.monthOptionTextSelected,
-                        ]}
-                      >
-                        {mes.nome}
-                      </Text>
-
-                      {selecionado && (
-                        <Feather
-                          name="check"
-                          size={16}
-                          color={Colors.teal800}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        </>
-      )}
       {/* CONTEÚDO */}
       {loading ? (
         <View style={styles.centerState}>
@@ -399,6 +275,7 @@ export default function HistoryScreen() {
           renderItem={renderNotificacao}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={selectedNotification ? null : filtrosHeader}
           ItemSeparatorComponent={() => (
             <View
               style={{
@@ -609,6 +486,11 @@ function NotificacaoDetailModal({
                 />
 
                 <DetailRow
+                  label="Data da ocorrência"
+                  value={formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
+                />
+
+                <DetailRow
                   label="Local da ocorrência"
                   value={item.local_ocorrencia || "Não informado"}
                 />
@@ -690,31 +572,6 @@ function NotificacaoDetailModal({
 /* =========================================================
    HELPERS
 ========================================================= */
-
-function formatarData(data: string) {
-  if (!data) {
-    return "Data não informada";
-  }
-
-  const date = new Date(data);
-
-  if (Number.isNaN(date.getTime())) {
-    return data;
-  }
-
-  return (
-    date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }) +
-    " • " +
-    date.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  );
-}
 
 function formatarAfetados(quantidade: number, categoria: string) {
   if (categoria === "EPIZOOTIA") {
@@ -880,46 +737,8 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  filterContainer: {
-    backgroundColor: "#F4F8F7",
-    paddingTop: Spacing.md,
-    paddingBottom: 4,
-  },
-
-  filterContent: {
-    paddingHorizontal: Spacing.md,
-    gap: 10,
-  },
-
-  filterButton: {
-    height: 36,
-    paddingHorizontal: 17,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#D5E2DF",
-    backgroundColor: Colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  filterButtonSelected: {
-    backgroundColor: Colors.teal800,
-    borderColor: Colors.teal800,
-  },
-
-  filterText: {
-    fontSize: FontSize.sm,
-    color: Colors.gray600,
-    fontWeight: "500",
-  },
-
-  filterTextSelected: {
-    color: Colors.white,
-    fontWeight: "700",
-  },
-
-  filterTextSmall: {
-    fontSize: 12,
+  filtersBlock: {
+    marginBottom: Spacing.md,
   },
 
   listContent: {
@@ -1007,81 +826,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.gray600,
   },
-  monthFilterContainer: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
-    position: "relative",
-    zIndex: 1,
-    elevation: 1,
-  },
 
-  monthFilterButton: {
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#D5E2DF",
-    backgroundColor: Colors.white,
-  },
-
-  monthFilterText: {
-    flexShrink: 1,
-    fontSize: FontSize.sm,
-    fontWeight: "600",
-    color: Colors.teal800,
-  },
-
-  monthDropdown: {
-    marginTop: 6,
-    alignSelf: "flex-start",
-    width: 260,
-    maxWidth: "100%",
-    maxHeight: 260,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: "#D5E2DF",
-    borderRadius: 12,
-    overflow: "hidden",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-  },
-
-  monthOption: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E5EEEB",
-  },
-
-  monthOptionSelected: {
-    backgroundColor: "#E8F5F1",
-  },
-
-  monthOptionText: {
-    flex: 1,
-    marginRight: 8,
-    fontSize: FontSize.sm,
-    color: Colors.gray600,
-  },
-
-  monthOptionTextSelected: {
-    color: Colors.teal800,
-    fontWeight: "700",
-  },
   modalCloseButton: {
     width: 38,
     height: 38,

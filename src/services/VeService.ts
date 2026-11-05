@@ -1,5 +1,6 @@
 import { getItem } from "@/utils/storage";
 import { normalizarNotificacoes } from "@/utils/status";
+import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 import type { Notificacao } from "./NotificationService";
 
 //const BASE_URL = "https://yara-project.onrender.com";
@@ -33,10 +34,14 @@ export async function listarNotificacoesVE(): Promise<Notificacao[]> {
   return normalizarNotificacoes((data["Notificações"] ?? []) as Notificacao[]);
 }
 
-export async function baixarRelatorioXlsxVE(): Promise<Blob> {
+export async function baixarRelatorioXlsxVE(
+  filtros?: FiltrosRelatorio,
+): Promise<Blob> {
   const headers = await authHeader();
 
-  const response = await fetch(`${BASE_URL}/ve/exportar_relatorio/xlsx`, {
+  const url = `${BASE_URL}/ve/exportar_relatorio/xlsx${montarQueryRelatorio(filtros)}`;
+
+  const response = await fetch(url, {
     method: "GET",
     headers,
   });

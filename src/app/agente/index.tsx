@@ -1,4 +1,5 @@
 import { AllNotificationsButton } from "@/components/AllNotificationsButton";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { NotificationRow } from "@/components/NotificationRow";
 import { QuickActionButton } from "@/components/QuickActionbutton";
 import { StatsCard } from "@/components/StatsCard";
@@ -455,6 +456,13 @@ function NotificacaoDetailModal({
                 <DetailRow
                   label="Data de envio"
                   value={formatarDataCompleta(item.data_envio)}
+                />
+
+                <DetailRow
+                  label="Data da ocorrência"
+                  value={formatarDataOcorrencia(item.data_ocorrencia, {
+                    comAno: true,
+                  })}
                 />
 
                 <DetailRow

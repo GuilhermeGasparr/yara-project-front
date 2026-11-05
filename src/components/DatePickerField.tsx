@@ -13,12 +13,24 @@ interface DatePickerFieldProps {
   value: string;
   onChange: (date: string) => void;
   placeholder?: string;
+  /** Menor data permitida (YYYY-MM-DD). */
+  minDate?: string;
+  /** Maior data permitida (YYYY-MM-DD). */
+  maxDate?: string;
+}
+
+function paraDate(valor: string): Date {
+  const [year, month, day] = valor.split("-").map(Number);
+
+  return new Date(year, month - 1, day);
 }
 
 export default function DatePickerField({
   value,
   onChange,
   placeholder = "Selecione uma data",
+  minDate,
+  maxDate,
 }: DatePickerFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -36,6 +48,8 @@ export default function DatePickerField({
           <input
             type="date"
             value={value}
+            min={minDate || undefined}
+            max={maxDate || undefined}
             onChange={(event) => {
               onChange(event.target.value);
             }}
@@ -80,17 +94,9 @@ export default function DatePickerField({
 
       {showPicker && (
         <DateTimePicker
-          value={
-            value
-              ? (() => {
-                  const [year, month, day] = value
-                    .split("-")
-                    .map(Number);
-
-                  return new Date(year, month - 1, day);
-                })()
-              : new Date()
-          }
+          value={value ? paraDate(value) : new Date()}
+          minimumDate={minDate ? paraDate(minDate) : undefined}
+          maximumDate={maxDate ? paraDate(maxDate) : undefined}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={(event, date) => {

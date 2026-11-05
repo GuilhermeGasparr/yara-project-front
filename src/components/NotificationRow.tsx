@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { Notificacao, NotificacaoStatus } from '@/services/NotificationService';
+import { formatarDataOcorrencia } from '@/utils/datas';
 
 const STATUS_CONFIG: Record<
   NotificacaoStatus,
@@ -54,12 +55,7 @@ export function NotificationRow({ item, onPress }: Props) {
   const status =
     STATUS_CONFIG[item.status] ?? STATUS_CONFIG['EM ANDAMENTO'];
 
-  const data = new Date(item.data_envio).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const data = formatarDataOcorrencia(item.data_ocorrencia);
 
   return (
     <TouchableOpacity

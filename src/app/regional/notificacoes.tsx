@@ -11,7 +11,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 
 import { Feather } from "@expo/vector-icons";
@@ -27,15 +26,25 @@ import {
 } from "@/services/RegionalService";
 import type { Notificacao } from "@/services/NotificationService";
 import { baixarBlob } from "@/utils/downloadFile";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import { ExportHeaderButton } from "@/components/ExportHeaderButton";
-
-const filtros = ["Todos", "DOENÇA", "EPIZOOTIA", "DESASTRE", "EM INVESTIGAÇÃO"];
+import { DateRangeFilter } from "@/components/filters/DateRangeFilter";
+import { FilterChipGroup } from "@/components/filters/FilterChipGroup";
+import {
+  CATEGORIAS_FILTRO,
+  STATUS_FILTRO,
+  correspondeCategoria,
+  correspondeStatus,
+  dentroDoPeriodo,
+  normalizar,
+  periodoInvalido,
+  valorFiltro,
+} from "@/utils/filtros";
 
 export default function RegionalNotificationsScreen() {
-  const { width } = useWindowDimensions();
-
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [filtro, setFiltro] = useState("Todos");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("TODOS");
+  const [statusFiltro, setStatusFiltro] = useState("TODOS");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,19 +56,33 @@ export default function RegionalNotificationsScreen() {
   const [filtroCoads, setFiltroCoads] = useState("Todas as COADS");
   const [mostrarOpcoesCoads, setMostrarOpcoesCoads] = useState(false);
 
-  // Estados do filtro por Mês
-  const [mesFiltro, setMesFiltro] = useState("Todos os meses");
-  const [mostrarOpcoesMes, setMostrarOpcoesMes] = useState(false);
+  // Período (YYYY-MM-DD); vazio = sem limite
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
   const [exportando, setExportando] = useState(false);
 
   async function handleExportarTodas() {
     if (exportando) return;
 
+    if (periodoInvalido(dataInicio, dataFim)) {
+      Alert.alert(
+        "Período inválido",
+        "A data início não pode ser posterior à data fim.",
+      );
+      return;
+    }
+
     try {
       setExportando(true);
 
-      const blob = await exportarRelatorioRegionalXlsx();
+      const blob = await exportarRelatorioRegionalXlsx({
+        data_inicio: dataInicio || undefined,
+        data_fim: dataFim || undefined,
+        categoria: valorFiltro(categoriaFiltro, "TODOS"),
+        status: valorFiltro(statusFiltro, "TODOS"),
+        coads: valorFiltro(filtroCoads, "Todas as COADS"),
+      });
 
       baixarBlob(blob, "notificacoes_regional.xlsx");
     } catch (error) {
@@ -73,14 +96,6 @@ export default function RegionalNotificationsScreen() {
       setExportando(false);
     }
   }
-
-  const isSmallScreen = width < 380;
-  const normalizar = (valor?: string) =>
-    valor
-      ?.trim()
-      .toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
 
   // ─── Carregar notificações da Regional ─────────────────────────────────────
   const carregarCoads = useCallback(async () => {
@@ -126,39 +141,9 @@ export default function RegionalNotificationsScreen() {
     carregarNotificacoes();
   }, [carregarNotificacoes]);
 
-  // ─── Meses Disponíveis ────────────────────────────────────────────────────
-  const mesesDisponiveis = useMemo(() => {
-    const meses = new Map<string, string>();
-
-    notificacoes.forEach((item) => {
-      if (!item.data_envio) return;
-
-      const data = new Date(item.data_envio);
-
-      if (Number.isNaN(data.getTime())) return;
-
-      const valor = `${data.getFullYear()}-${String(
-        data.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      const nome = data.toLocaleDateString("pt-BR", {
-        month: "long",
-        year: "numeric",
-      });
-
-      meses.set(valor, nome.charAt(0).toUpperCase() + nome.slice(1));
-    });
-
-    return Array.from(meses, ([valor, nome]) => ({
-      valor,
-      nome,
-    })).sort((a, b) => b.valor.localeCompare(a.valor));
-  }, [notificacoes]);
-
   // ─── Filtros ──────────────────────────────────────────────────────────────
   const notificacoesFiltradas = useMemo(() => {
     return notificacoes.filter((item) => {
-      // Filtro por COADS
       if (
         filtroCoads !== "Todas as COADS" &&
         normalizar(item.coads) !== normalizar(filtroCoads)
@@ -166,33 +151,20 @@ export default function RegionalNotificationsScreen() {
         return false;
       }
 
-      // Filtro por Mês
-      if (mesFiltro !== "Todos os meses") {
-        if (!item.data_envio) return false;
-
-        const data = new Date(item.data_envio);
-
-        if (Number.isNaN(data.getTime())) return false;
-
-        const valor = `${data.getFullYear()}-${String(
-          data.getMonth() + 1,
-        ).padStart(2, "0")}`;
-
-        if (valor !== mesFiltro) return false;
-      }
-
-      // Filtro por categoria ou status
-      if (filtro === "Todos") {
-        return true;
-      }
-
-      if (filtro === "EM INVESTIGAÇÃO") {
-        return normalizar(item.status) === "EM INVESTIGACAO";
-      }
-
-      return normalizar(item.categoria) === normalizar(filtro);
+      return (
+        correspondeCategoria(item.categoria, categoriaFiltro) &&
+        correspondeStatus(item.status, statusFiltro) &&
+        dentroDoPeriodo(item.data_ocorrencia, dataInicio, dataFim)
+      );
     });
-  }, [notificacoes, filtro, filtroCoads, mesFiltro]);
+  }, [
+    notificacoes,
+    categoriaFiltro,
+    statusFiltro,
+    filtroCoads,
+    dataInicio,
+    dataFim,
+  ]);
 
   // ─── Card ──────────────────────────────────────────────────────────────────
   const renderNotificacao = ({ item }: { item: Notificacao }) => {
@@ -234,7 +206,7 @@ export default function RegionalNotificationsScreen() {
         <Text style={styles.metadata}>
           {item.municipio ?? "Município não informado"}
           {" • "}
-          {formatarData(item.data_envio)}
+          {formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
         </Text>
 
         <Text style={styles.eventType}>{item.tipo_evento}</Text>
@@ -283,6 +255,119 @@ export default function RegionalNotificationsScreen() {
     );
   };
 
+  const filtrosHeader = (
+    <View style={styles.filtersBlock}>
+      <View style={styles.dropdownsStack}>
+        {/* COADS */}
+        <View style={styles.dropdownSection}>
+          <Pressable
+            style={[
+              styles.dropdownButton,
+              filtroCoads !== "Todas as COADS" && styles.dropdownButtonSelected,
+            ]}
+            onPress={() => setMostrarOpcoesCoads((prev) => !prev)}
+          >
+            <View style={styles.dropdownLeft}>
+              <Feather
+                name="filter"
+                size={16}
+                color={
+                  filtroCoads !== "Todas as COADS"
+                    ? Colors.white
+                    : Colors.teal800
+                }
+              />
+              <Text
+                style={[
+                  styles.dropdownButtonText,
+                  filtroCoads !== "Todas as COADS" &&
+                    styles.dropdownButtonTextSelected,
+                ]}
+                numberOfLines={1}
+              >
+                {filtroCoads === "Todas as COADS"
+                  ? "Filtrar por COADS"
+                  : filtroCoads}
+              </Text>
+            </View>
+
+            <Feather
+              name={mostrarOpcoesCoads ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={
+                filtroCoads !== "Todas as COADS" ? Colors.white : Colors.teal800
+              }
+            />
+          </Pressable>
+
+          {mostrarOpcoesCoads && (
+            <View style={styles.dropdownListContainer}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                {["Todas as COADS", ...coadsDisponiveis].map((coads) => {
+                  const selecionada = filtroCoads === coads;
+
+                  return (
+                    <Pressable
+                      key={coads}
+                      style={[
+                        styles.dropdownOption,
+                        selecionada && styles.dropdownOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setFiltroCoads(coads);
+                        setMostrarOpcoesCoads(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownOptionText,
+                          selecionada && styles.dropdownOptionTextSelected,
+                        ]}
+                      >
+                        {coads}
+                      </Text>
+
+                      {selecionada && (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={Colors.teal800}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <DateRangeFilter
+        inicio={dataInicio}
+        fim={dataFim}
+        onChange={(inicio, fim) => {
+          setDataInicio(inicio);
+          setDataFim(fim);
+        }}
+      />
+
+      <FilterChipGroup
+        label="Categoria"
+        options={CATEGORIAS_FILTRO}
+        selected={categoriaFiltro}
+        onSelect={setCategoriaFiltro}
+      />
+
+      <FilterChipGroup
+        label="Status"
+        options={STATUS_FILTRO}
+        selected={statusFiltro}
+        onSelect={setStatusFiltro}
+      />
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.teal800} />
@@ -303,239 +388,6 @@ export default function RegionalNotificationsScreen() {
           onPress={handleExportarTodas}
           loading={exportando}
         />
-      </View>
-
-      {/* FILTROS */}
-      <View style={styles.filterContainer}>
-        {/* Categorias (Horizontal) */}
-        <FlatList
-          horizontal
-          data={filtros}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-          renderItem={({ item }) => {
-            const selected = filtro === item;
-
-            return (
-              <Pressable
-                onPress={() => setFiltro(item)}
-                style={[
-                  styles.filterButton,
-                  selected && styles.filterButtonSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selected && styles.filterTextSelected,
-                    isSmallScreen && styles.filterTextSmall,
-                  ]}
-                >
-                  {formatarFiltro(item)}
-                </Text>
-              </Pressable>
-            );
-          }}
-        />
-
-        {/* FILTROS VERTICAIS (UM ABAIXO DO OUTRO) */}
-        <View style={styles.dropdownsStack}>
-          {/* 1. FILTRO DE COADS */}
-          <View style={styles.dropdownSection}>
-            <Pressable
-              style={[
-                styles.dropdownButton,
-                filtroCoads !== "Todas as COADS" && styles.dropdownButtonSelected,
-              ]}
-              onPress={() => setMostrarOpcoesCoads((prev) => !prev)}
-            >
-              <View style={styles.dropdownLeft}>
-                <Feather
-                  name="filter"
-                  size={16}
-                  color={
-                    filtroCoads !== "Todas as COADS"
-                      ? Colors.white
-                      : Colors.teal800
-                  }
-                />
-                <Text
-                  style={[
-                    styles.dropdownButtonText,
-                    filtroCoads !== "Todas as COADS" &&
-                      styles.dropdownButtonTextSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {filtroCoads === "Todas as COADS"
-                    ? "Filtrar por COADS"
-                    : filtroCoads}
-                </Text>
-              </View>
-
-              <Feather
-                name={mostrarOpcoesCoads ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={
-                  filtroCoads !== "Todas as COADS" ? Colors.white : Colors.teal800
-                }
-              />
-            </Pressable>
-
-            {mostrarOpcoesCoads && (
-              <View style={styles.dropdownListContainer}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
-                  {["Todas as COADS", ...coadsDisponiveis].map((coads) => {
-                    const selecionada = filtroCoads === coads;
-
-                    return (
-                      <Pressable
-                        key={coads}
-                        style={[
-                          styles.dropdownOption,
-                          selecionada && styles.dropdownOptionSelected,
-                        ]}
-                        onPress={() => {
-                          setFiltroCoads(coads);
-                          setMostrarOpcoesCoads(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownOptionText,
-                            selecionada && styles.dropdownOptionTextSelected,
-                          ]}
-                        >
-                          {coads}
-                        </Text>
-
-                        {selecionada && (
-                          <Feather
-                            name="check"
-                            size={16}
-                            color={Colors.teal800}
-                          />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          {/* 2. FILTRO DE MÊS */}
-          <View style={styles.dropdownSection}>
-            <Pressable
-              style={[
-                styles.dropdownButton,
-                mesFiltro !== "Todos os meses" && styles.dropdownButtonSelected,
-              ]}
-              onPress={() => setMostrarOpcoesMes((prev) => !prev)}
-            >
-              <View style={styles.dropdownLeft}>
-                <Feather
-                  name="calendar"
-                  size={16}
-                  color={
-                    mesFiltro !== "Todos os meses"
-                      ? Colors.white
-                      : Colors.teal800
-                  }
-                />
-                <Text
-                  style={[
-                    styles.dropdownButtonText,
-                    mesFiltro !== "Todos os meses" &&
-                      styles.dropdownButtonTextSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {mesFiltro === "Todos os meses"
-                    ? "Filtrar por Mês"
-                    : mesesDisponiveis.find((m) => m.valor === mesFiltro)
-                        ?.nome || mesFiltro}
-                </Text>
-              </View>
-
-              <Feather
-                name={mostrarOpcoesMes ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={
-                  mesFiltro !== "Todos os meses" ? Colors.white : Colors.teal800
-                }
-              />
-            </Pressable>
-
-            {mostrarOpcoesMes && (
-              <View style={styles.dropdownListContainer}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
-                  <Pressable
-                    style={[
-                      styles.dropdownOption,
-                      mesFiltro === "Todos os meses" &&
-                        styles.dropdownOptionSelected,
-                    ]}
-                    onPress={() => {
-                      setMesFiltro("Todos os meses");
-                      setMostrarOpcoesMes(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownOptionText,
-                        mesFiltro === "Todos os meses" &&
-                          styles.dropdownOptionTextSelected,
-                      ]}
-                    >
-                      Todos os meses
-                    </Text>
-
-                    {mesFiltro === "Todos os meses" && (
-                      <Feather name="check" size={16} color={Colors.teal800} />
-                    )}
-                  </Pressable>
-
-                  {mesesDisponiveis.map((mes) => {
-                    const selecionada = mesFiltro === mes.valor;
-
-                    return (
-                      <Pressable
-                        key={mes.valor}
-                        style={[
-                          styles.dropdownOption,
-                          selecionada && styles.dropdownOptionSelected,
-                        ]}
-                        onPress={() => {
-                          setMesFiltro(mes.valor);
-                          setMostrarOpcoesMes(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownOptionText,
-                            selecionada && styles.dropdownOptionTextSelected,
-                          ]}
-                        >
-                          {mes.nome}
-                        </Text>
-
-                        {selecionada && (
-                          <Feather
-                            name="check"
-                            size={16}
-                            color={Colors.teal800}
-                          />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-        </View>
       </View>
 
       {/* CONTEÚDO */}
@@ -562,6 +414,7 @@ export default function RegionalNotificationsScreen() {
           renderItem={renderNotificacao}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={filtrosHeader}
           ItemSeparatorComponent={() => (
             <View style={{ height: Spacing.md }} />
           )}
@@ -723,6 +576,11 @@ function NotificacaoDetailModal({
             />
 
             <DetailRow
+              label="Data da ocorrência"
+              value={formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
+            />
+
+            <DetailRow
               label="Local da ocorrência"
               value={item.local_ocorrencia || "Não informado"}
             />
@@ -860,18 +718,6 @@ function formatarCategoria(categoria: string) {
   }
 }
 
-function formatarFiltro(filtro: string) {
-  if (filtro === "Todos") {
-    return "Todos";
-  }
-
-  if (filtro === "EM INVESTIGAÇÃO") {
-    return "Em investigação";
-  }
-
-  return formatarCategoria(filtro);
-}
-
 function formatarStatus(status: string) {
   switch (status) {
     case "EM ANDAMENTO":
@@ -1005,52 +851,13 @@ const styles = StyleSheet.create({
   },
 
   // Filtros
-  filterContainer: {
-    backgroundColor: "#F4F8F7",
-    paddingTop: Spacing.md,
-    paddingBottom: 8,
-  },
-
-  filterContent: {
-    paddingHorizontal: Spacing.md,
-    gap: 10,
-  },
-
-  filterButton: {
-    height: 36,
-    paddingHorizontal: 17,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#D5E2DF",
-    backgroundColor: Colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  filterButtonSelected: {
-    backgroundColor: Colors.teal800,
-    borderColor: Colors.teal800,
-  },
-
-  filterText: {
-    fontSize: FontSize.sm,
-    color: Colors.gray600,
-    fontWeight: "500",
-  },
-
-  filterTextSelected: {
-    color: Colors.white,
-    fontWeight: "700",
-  },
-
-  filterTextSmall: {
-    fontSize: 12,
+  filtersBlock: {
+    marginBottom: Spacing.md,
   },
 
   // Filtros em pilha (Um abaixo do outro)
   dropdownsStack: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
+    marginBottom: Spacing.md,
     gap: 8,
   },
 

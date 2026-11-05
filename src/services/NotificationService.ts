@@ -1,4 +1,5 @@
 import { getItem } from "@/utils/storage";
+import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 import { normalizarNotificacoes } from "@/utils/status";
 import { Platform } from "react-native";
 //const BASE_URL = "https://yara-project.onrender.com";
@@ -21,6 +22,7 @@ export interface Notificacao {
   tipo_evento: string;
   categoria: Categoria;
   data_envio: string;
+  data_ocorrencia: string;
   pessoas_animais_infectados_afetados: number;
   local_ocorrencia: string;
   municipio?: string;
@@ -117,10 +119,14 @@ export async function baixarRelatorioNotificacaoXlsx(
 }
 
 // GET /agentes/exportar_relatorio/xlsx — todas as notificações do agente
-export async function exportarRelatorioAgenteXlsx(): Promise<Blob> {
+export async function exportarRelatorioAgenteXlsx(
+  filtros?: FiltrosRelatorio,
+): Promise<Blob> {
   const headers = await authHeader();
 
-  const res = await fetch(`${BASE_URL}/agentes/exportar_relatorio/xlsx`, {
+  const url = `${BASE_URL}/agentes/exportar_relatorio/xlsx${montarQueryRelatorio(filtros)}`;
+
+  const res = await fetch(url, {
     method: "GET",
     headers,
   });

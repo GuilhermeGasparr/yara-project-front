@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AllNotificationsButton } from "@/components/AllNotificationsButton";
+import { formatarDataOcorrencia } from "@/utils/datas";
 import NotificationsByCategory from "@/components/regional/NotificationsByCategory";
 import RegionalAlert from "@/components/regional/RegionalAlert";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
@@ -119,14 +120,7 @@ function NotificacaoCard({
         ? "#BA7517"
         : "#378ADD";
 
-  const data = new Date(item.data_envio);
-
-  const dataFormatada = Number.isNaN(data.getTime())
-    ? item.data_envio
-    : data.toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-      });
+  const dataFormatada = formatarDataOcorrencia(item.data_ocorrencia);
 
   return (
     <TouchableOpacity
@@ -291,8 +285,15 @@ function NotificacaoDetailModal({
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Data</Text>
+              <Text style={styles.detailLabel}>Data de envio</Text>
               <Text style={styles.detailValue}>{dataFormatada}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Data da ocorrência</Text>
+              <Text style={styles.detailValue}>
+                {formatarDataOcorrencia(item.data_ocorrencia, { comAno: true })}
+              </Text>
             </View>
 
             <View style={styles.detailRow}>
