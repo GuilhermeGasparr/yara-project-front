@@ -61,7 +61,7 @@ export function buildUserFromToken(
   }
 
   // =========================
-  // Coordenador Municipal
+  // nador Municipal
   // =========================
   if (tipo === "CM") {
     return {

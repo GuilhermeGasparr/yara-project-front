@@ -22,7 +22,6 @@ const ACAO_POR_STATUS: Record<
   ENCERRADO: setEncerrado,
 };
 
-/** Lista, seleção e ações (status/exclusão) das notificações do Coordenador Municipal. */
 export function useCmNotificacoes() {
   const [notificacoes, setNotificacoes] = useState<NotificacaoCM[]>([]);
   const [loading, setLoading] = useState(true);

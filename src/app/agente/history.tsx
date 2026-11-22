@@ -654,8 +654,8 @@ function getStatusStyle(status: string) {
   switch (status) {
     case "EM INVESTIGAÇÃO":
       return {
-        backgroundColor: "#FFF0D8",
-        color: "#A15C00",
+        backgroundColor: "#f3d5b0",
+        color: "#C2410C",
       };
 
     case "VERÍDICO":
@@ -666,20 +666,20 @@ function getStatusStyle(status: string) {
 
     case "NÃO VERÍDICO":
       return {
-        backgroundColor: "#FDE8E8",
-        color: "#C62828",
+        backgroundColor: "#e4b1ff",
+        color: "#6002b9",
       };
 
     case "EM ANDAMENTO":
       return {
-        backgroundColor: "#E4F0FD",
-        color: "#1261A0",
+        backgroundColor: "#fad4d4",
+        color: "#B91C1C",
       };
 
     case "ENCERRADO":
       return {
-        backgroundColor: "#F0EEE9",
-        color: "#77736A",
+        backgroundColor: "#e1dfe9",
+        color: "#082367",
       };
 
     default:

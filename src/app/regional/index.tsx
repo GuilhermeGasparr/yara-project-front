@@ -43,20 +43,20 @@ function normalizar(valor?: string) {
 // ─── Configuração de status ──────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
   {
-    "EM ANDAMENTO": { label: "Pendente", bg: "#E4F0FD", color: "#1261A0" },
-    PENDENTE: { label: "Pendente", bg: "#E4F0FD", color: "#1261A0" },
+    "EM ANDAMENTO": { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
+    PENDENTE: { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
     "EM INVESTIGACAO": {
       label: "Em investigação",
-      bg: "#FAEEDA",
-      color: "#854F0B",
+      bg: "#f3d5b0",
+      color: "#C2410C",
     },
     VERIDICO: { label: "Verídico", bg: Colors.teal50, color: Colors.teal800 },
     "NAO VERIDICO": {
       label: "Não verídico",
-      bg: "#FDE8E8",
-      color: "#C62828",
+      bg: "#e4b1ff",
+      color: "#6002b9",
     },
-    ENCERRADO: { label: "Encerrado", bg: Colors.gray50, color: Colors.gray600 },
+    ENCERRADO: { label: "Encerrado", bg: "#e1dfe9", color: "#082367" },
   };
 // ─── Componentes ─────────────────────────────────────────────────────────────
 
@@ -617,7 +617,6 @@ export default function RegionalHomeScreen() {
           <Feather name="chevron-right" size={20} color={Colors.gray400} />
         </TouchableOpacity>
 
-        {/* ─── Criar conta Coordenador Municipal ─────────────────────────── */}
         <TouchableOpacity
           style={styles.createCMButton}
           onPress={() => router.navigate("/regional/createCM")}

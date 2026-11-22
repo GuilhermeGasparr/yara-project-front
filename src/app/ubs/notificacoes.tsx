@@ -896,20 +896,20 @@ function getStatusStyle(status: string) {
 
     case "NÃO VERÍDICO":
       return {
-        backgroundColor: "#FDE8E8",
-        color: "#C62828",
+        backgroundColor: "#e4b1ff",
+        color: "#6002b9",
       };
 
     case "EM ANDAMENTO":
       return {
-        backgroundColor: "#E4F0FD",
-        color: "#1261A0",
+        backgroundColor: "#FDE8E8",
+        color: "#C62828",
       };
 
     case "ENCERRADO":
       return {
-        backgroundColor: "#F0EEE9",
-        color: "#77736A",
+        backgroundColor: "#e1dfe9",
+        color: "#082367",
       };
 
     default:

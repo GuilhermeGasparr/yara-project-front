@@ -419,7 +419,6 @@ export default function CreateCMScreen() {
             </Text>
           </View>
 
-          {/* Dados do Coordenador */}
           <Text style={styles.sectionLabel}>Informações do Vigilante Municipal</Text>
 
           <AnimatedField

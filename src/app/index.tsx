@@ -116,7 +116,7 @@ function RoleSelector({
     Animated.timing(fadeCM, {
       toValue: selectedRole === "CM" ? 1 : 0.6,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver:true,
     }).start();
 
     Animated.timing(fadeVR, {
@@ -355,7 +355,7 @@ function RoleSelector({
               selectedRole === "CM" && styles.selectorTextActive,
             ]}
           >
-            Vigilante Municipal
+            Vigilância Municipal
           </Text>
         </Animated.View>
       </Pressable>
@@ -388,7 +388,7 @@ function RoleSelector({
               selectedRole === "VR" && styles.selectorTextActive,
             ]}
           >
-            Vig. Regional
+            Vigilância Regional
           </Text>
         </Animated.View>
       </Pressable>
@@ -421,7 +421,7 @@ function RoleSelector({
               selectedRole === "VE" && styles.selectorTextActive,
             ]}
           >
-            Vig. Estadual
+            Vigilância Estadual
           </Text>
         </Animated.View>
       </Pressable>

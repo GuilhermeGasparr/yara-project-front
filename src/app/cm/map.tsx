@@ -60,7 +60,6 @@ export default function CMMapScreen() {
     try {
       setLoading(true);
 
-      // Usa o serviço autenticado da Coordenação Municipal.
       const lista = await listarNotificacoesCM();
       setNotificacoes(lista);
 

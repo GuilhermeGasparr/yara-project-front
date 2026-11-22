@@ -115,7 +115,7 @@ export default function CmNotificacoesScreen() {
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerLabel}>Coordenação Municipal</Text>
+          <Text style={styles.headerLabel}>Vigilância Municipal</Text>
           <Text style={styles.headerTitle}>Notificações</Text>
         </View>
 

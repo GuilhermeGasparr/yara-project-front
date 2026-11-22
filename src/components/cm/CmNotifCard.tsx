@@ -1,140 +1,175 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
-import type { NotificacaoCM, StatusCM } from "@/services/CmService";
-import { CATEGORIA_COLOR, STATUS_CFG } from "@/components/cm/cmNotificacao";
 import { formatarDataOcorrencia } from "@/utils/datas";
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
-// ─── Badge de status ──────────────────────────────────────────────────────────
+import type {NotificacaoCM} from "@/services/CmService";
+function normalizar(valor?: string) {
+  return (
+    valor
+      ?.trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") ?? ""
+  );
+}
 
-export function StatusBadge({ status }: { status: StatusCM }) {
-  const cfg = STATUS_CFG[status] ?? {
+// ─── Configuração de status (mesmas cores da Regional) ───────────────────────
+const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
+  {
+    "EM ANDAMENTO": { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
+    PENDENTE: { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
+    "EM INVESTIGACAO": {
+      label: "Em investigação",
+      bg: "#f3d5b0",
+      color: "#C2410C",
+    },
+    VERIDICO: { label: "Verídico", bg: Colors.teal50, color: Colors.teal800 },
+    "NAO VERIDICO": {
+      label: "Não verídico",
+      bg: "#e4b1ff",
+      color: "#6002b9",
+    },
+    ENCERRADO: { label: "Encerrado", bg: "#e1dfe9", color: "#082367" },
+  };
+
+function StatusBadge({ status }: { status: string }) {
+  const config = STATUS_CFG[normalizar(status)] ?? {
     label: status,
     bg: Colors.gray50,
     color: Colors.gray600,
   };
+
   return (
-    <View style={[s.badge, { backgroundColor: cfg.bg }]}>
-      <Text style={[s.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+      <Text style={[styles.statusText, { color: config.color }]}>
+        {config.label}
+      </Text>
     </View>
   );
 }
 
-// ─── Card de notificação ──────────────────────────────────────────────────────
-
-interface NotifCardProps {
+export function CmNotifCard({
+  item,
+  onPress,
+}: {
   item: NotificacaoCM;
   onPress: () => void;
-}
+}) {
+  const categoriaNorm = normalizar(item.categoria);
+  const categoriaColor =
+    categoriaNorm === "DOENCA"
+      ? Colors.red400
+      : categoriaNorm === "EPIZOOTIA"
+        ? "#BA7517"
+        : "#378ADD";
 
-export function CmNotifCard({ item, onPress }: NotifCardProps) {
-  const dotColor = CATEGORIA_COLOR[item.categoria] ?? Colors.teal400;
-  const data = formatarDataOcorrencia(item.data_ocorrencia);
+  const dataFormatada = formatarDataOcorrencia(item.data_ocorrencia);
 
   return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.82}>
-      <View style={s.cardHeader}>
-        <View style={s.cardTitleRow}>
-          <View style={[s.dot, { backgroundColor: dotColor }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.cardTitle} numberOfLines={1}>
-              {item.tipo_evento}
-            </Text>
-            <Text style={s.cardMeta}>
-              {data} · {item.local_ocorrencia}
-            </Text>
-          </View>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={[styles.notificationCard, { borderLeftColor: categoriaColor }]}
+    >
+      <View style={styles.notificationHeader}>
+        <View style={styles.notificationTitleArea}>
+          <Text style={styles.notificationTitle} numberOfLines={1}>
+            {item.tipo_evento}
+          </Text>
+
+          <Text style={styles.notificationMeta}>
+            {item.endereco ?? "Endereço não informado"} · {dataFormatada}
+          </Text>
         </View>
+
         <StatusBadge status={item.status} />
       </View>
-      <Text style={s.cardInfo}>
-        {item.pessoas_animais_infectados_afetados} afetados · #
-        {String(item.id).padStart(4, "0")}
-      </Text>
-      <View style={s.cardFooter}>
+
+      <View style={styles.notificationFooter}>
         <View
           style={[
-            s.catBadge,
-            { backgroundColor: CATEGORIA_COLOR[item.categoria] + "18" },
+            styles.categoryBadge,
+            { backgroundColor: `${categoriaColor}18` },
           ]}
         >
-          <Text
-            style={[
-              s.catBadgeText,
-              { color: CATEGORIA_COLOR[item.categoria] ?? Colors.teal600 },
-            ]}
-          >
+          <Text style={[styles.categoryText, { color: categoriaColor }]}>
             {item.categoria}
           </Text>
         </View>
-        <Text style={s.verDetalhe}>Ver detalhes →</Text>
+
+        <Text style={styles.notificationId}>
+          #{String(item.id).padStart(4, "0")}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-const s = StyleSheet.create({
-  card: {
+const styles = StyleSheet.create({
+  notificationCard: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(15,110,86,0.08)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: Colors.gray100,
+    borderLeftWidth: 3,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  cardHeader: {
+
+  notificationHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
-  cardTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: Spacing.sm,
+
+  notificationTitleArea: {
     flex: 1,
   },
-  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 5, flexShrink: 0 },
-  cardTitle: {
-    fontSize: FontSize.base,
-    fontWeight: "600",
-    color: Colors.gray900,
+
+  notificationTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray800,
   },
-  cardMeta: { fontSize: FontSize.xs, color: Colors.gray400, marginTop: 2 },
-  cardInfo: {
+
+  notificationMeta: {
+    marginTop: 4,
     fontSize: FontSize.xs,
-    color: Colors.gray400,
-    marginBottom: Spacing.sm,
-    marginLeft: 20,
+    color: Colors.gray600,
   },
-  cardFooter: {
+
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  statusText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  notificationFooter: {
+    marginTop: Spacing.sm,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray50,
-    paddingTop: Spacing.sm,
+    justifyContent: "space-between",
   },
-  catBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 20,
+
+  categoryBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  catBadgeText: { fontSize: 10, fontWeight: "600" },
-  verDetalhe: {
-    fontSize: FontSize.xs,
-    color: Colors.teal600,
+
+  categoryText: {
+    fontSize: 10,
     fontWeight: "600",
   },
-  badge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 20,
+
+  notificationId: {
+    fontSize: 11,
+    color: Colors.gray400,
   },
-  badgeText: { fontSize: 10, fontWeight: "600" },
 });

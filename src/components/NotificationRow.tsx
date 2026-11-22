@@ -1,48 +1,53 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { Notificacao, NotificacaoStatus } from '@/services/NotificationService';
-import { formatarDataOcorrencia } from '@/utils/datas';
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const STATUS_CONFIG: Record<
-  NotificacaoStatus,
-  { label: string; bg: string; color: string }
-> = {
-  'EM ANDAMENTO': {
-    label: 'Pendente',
-    bg: Colors.teal50,
-    color: Colors.teal800,
-  },
+import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import type { Notificacao } from "@/services/NotificationService";
+import { formatarDataOcorrencia } from "@/utils/datas";
 
-  'EM INVESTIGAÇÃO': {
-    label: 'Em investigação',
-    bg: '#FAEEDA',
-    color: '#854F0B',
-  },
+function normalizar(valor?: string) {
+  return (
+    valor
+      ?.trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") ?? ""
+  );
+}
 
-  'VERÍDICO': {
-    label: 'Verídico',
-    bg: Colors.teal50,
-    color: Colors.teal800,
-  },
+// ─── Configuração de status (mesmas cores da Regional) ───────────────────────
+const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
+  {
+    "EM ANDAMENTO": { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
+    PENDENTE: { label: "Pendente", bg: "#fad4d4", color: "#B91C1C" },
+    "EM INVESTIGACAO": {
+      label: "Em investigação",
+      bg: "#f3d5b0",
+      color: "#C2410C",
+    },
+    VERIDICO: { label: "Verídico", bg: Colors.teal50, color: Colors.teal800 },
+    "NAO VERIDICO": {
+      label: "Não verídico",
+      bg: "#e4b1ff",
+      color: "#6002b9",
+    },
+    ENCERRADO: { label: "Encerrado", bg: "#e1dfe9", color: "#082367" },
+  };
 
-  'NÃO VERÍDICO': {
-    label: 'Não verídico',
+function StatusBadge({ status }: { status: string }) {
+  const config = STATUS_CFG[normalizar(status)] ?? {
+    label: status,
     bg: Colors.gray50,
     color: Colors.gray600,
-  },
+  };
 
-  'ENCERRADO': {
-    label: 'Encerrado',
-    bg: Colors.gray50,
-    color: Colors.gray400,
-  },
-};
-
-const CATEGORIA_DOT: Record<string, string> = {
-  'DOENÇA': Colors.red400,
-  'EPIZOOTIA': '#BA7517',
-  'DESASTRE': '#378ADD',
-};
+  return (
+    <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+      <Text style={[styles.statusText, { color: config.color }]}>
+        {config.label}
+      </Text>
+    </View>
+  );
+}
 
 interface Props {
   item: Notificacao;
@@ -50,50 +55,54 @@ interface Props {
 }
 
 export function NotificationRow({ item, onPress }: Props) {
-  const dot = CATEGORIA_DOT[item.categoria] ?? Colors.teal400;
+  const categoriaNorm = normalizar(item.categoria);
+  const categoriaColor =
+    categoriaNorm === "DOENCA"
+      ? Colors.red400
+      : categoriaNorm === "EPIZOOTIA"
+        ? "#BA7517"
+        : "#378ADD";
 
-  const status =
-    STATUS_CONFIG[item.status] ?? STATUS_CONFIG['EM ANDAMENTO'];
-
-  const data = formatarDataOcorrencia(item.data_ocorrencia);
+  const dataFormatada = formatarDataOcorrencia(item.data_ocorrencia);
 
   return (
     <TouchableOpacity
-      style={styles.row}
+      activeOpacity={0.85}
       onPress={() => onPress?.(item)}
-      activeOpacity={0.75}
+      style={[styles.notificationCard, { borderLeftColor: categoriaColor }]}
     >
-      <View style={[styles.dot, { backgroundColor: dot }]} />
-
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Text style={styles.title} numberOfLines={1}>
+      <View style={styles.notificationHeader}>
+        <View style={styles.notificationTitleArea}>
+          <Text style={styles.notificationTitle} numberOfLines={1}>
             {item.tipo_evento}
           </Text>
 
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: status.bg },
-            ]}
-          >
-            <Text
-              style={[
-                styles.badgeText,
-                { color: status.color },
-              ]}
-            >
-              {status.label}
-            </Text>
-          </View>
+          <Text style={styles.notificationMeta} numberOfLines={1}>
+            {item.local_ocorrencia || "Local não informado"} · {dataFormatada}
+          </Text>
         </View>
 
-        <Text style={styles.meta}>
-          {data} · {item.local_ocorrencia}
-        </Text>
+        <StatusBadge status={item.status} />
+      </View>
 
-        {item.rascunho && (
+      <View style={styles.notificationFooter}>
+        <View
+          style={[
+            styles.categoryBadge,
+            { backgroundColor: `${categoriaColor}18` },
+          ]}
+        >
+          <Text style={[styles.categoryText, { color: categoriaColor }]}>
+            {item.categoria}
+          </Text>
+        </View>
+
+        {item.rascunho ? (
           <Text style={styles.draft}>📝 Rascunho</Text>
+        ) : (
+          <Text style={styles.notificationId}>
+            #{String(item.id).padStart(4, "0")}
+          </Text>
         )}
       </View>
     </TouchableOpacity>
@@ -101,61 +110,76 @@ export function NotificationRow({ item, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(15,110,86,0.08)',
+  notificationCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.gray100,
+    borderLeftWidth: 3,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
   },
 
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 5,
-    flexShrink: 0,
-  },
-
-  content: {
-    flex: 1,
-    gap: 3,
-  },
-
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  notificationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: Spacing.sm,
   },
 
-  title: {
-    fontSize: FontSize.base,
-    fontWeight: '600',
-    color: Colors.gray900,
+  notificationTitleArea: {
     flex: 1,
   },
 
-  meta: {
+  notificationTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "700",
+    color: Colors.gray800,
+  },
+
+  notificationMeta: {
+    marginTop: 4,
     fontSize: FontSize.xs,
+    color: Colors.gray600,
+  },
+
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  statusText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  notificationFooter: {
+    marginTop: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  categoryBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  categoryText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  notificationId: {
+    fontSize: 11,
     color: Colors.gray400,
   },
 
   draft: {
-    fontSize: FontSize.xs,
+    fontSize: 11,
+    fontWeight: "600",
     color: Colors.teal600,
-    fontWeight: '500',
-  },
-
-  badge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
-  },
-
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '600',
   },
 });
