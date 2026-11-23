@@ -24,6 +24,7 @@ import { Platform } from "react-native";
 import { Alert } from "react-native";
 import { router } from "expo-router";
 
+import { AnexosNotificacao } from "@/components/AnexosNotificacao";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
@@ -528,6 +529,8 @@ function NotificacaoDetailModal({ item, onClose }: DetailModalProps) {
                 </Text>
               </View>
             </View>
+
+            <AnexosNotificacao midias={item.media_urls} />
 
             <View style={{ height: Spacing.xl }} />
           </ScrollView>

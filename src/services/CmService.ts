@@ -1,9 +1,10 @@
-import { getItem } from "@/utils/storage";
-import { normalizarNotificacoes } from "@/utils/status";
+import type { MidiaNotificacao } from "@/types";
 import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
+import { normalizarNotificacoes } from "@/utils/status";
+import { getItem } from "@/utils/storage";
 
 const BASE_URL = "https://yara-project.onrender.com";
-//const BASE_URL = "http://localhost:8000";
+// const BASE_URL = "http://localhost:8000";
 
 const SKIP = { "ngrok-skip-browser-warning": "true" };
 
@@ -39,6 +40,7 @@ export interface NotificacaoCM {
   acs_ace_id: number;
   status: StatusCM;
   rascunho: boolean;
+  media_urls?: MidiaNotificacao[];
 }
 
 export interface DashboardStats {

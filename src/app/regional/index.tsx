@@ -4,6 +4,7 @@ import { AllNotificationsButton } from "@/components/AllNotificationsButton";
 import { formatarDataOcorrencia } from "@/utils/datas";
 import NotificationsByCategory from "@/components/regional/NotificationsByCategory";
 import RegionalAlert from "@/components/regional/RegionalAlert";
+import { AnexosNotificacao } from "@/components/AnexosNotificacao";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import type { Notificacao } from "@/services/NotificationService";
@@ -321,6 +322,8 @@ function NotificacaoDetailModal({
               {item.descricao || "Não informado"}
             </Text>
           </View>
+
+          <AnexosNotificacao midias={item.media_urls} />
 
           <View style={styles.detailSection}>
             <Text style={styles.detailSectionTitle}>Origem</Text>
