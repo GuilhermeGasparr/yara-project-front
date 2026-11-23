@@ -16,7 +16,7 @@ import {
   criarNotificacao,
   listarNotificacoes,
 } from "@/services/NotificationService";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 
 const TOTAL_STEPS = 5; // passo 6 (sucesso) não conta na barra
 
@@ -159,10 +159,14 @@ export default function NewNotificationScreen() {
       setNotificacaoId(notificacaoCriada.id);
       setStep(6);
     } catch (err) {
-      Alert.alert(
-        "Erro ao enviar",
-        err instanceof Error ? err.message : "Tente novamente.",
-      );
+      const mensagem = err instanceof Error ? err.message : "Tente novamente.";
+
+      // Alert.alert não faz nada no react-native-web
+      if (Platform.OS === "web") {
+        window.alert(`Erro ao enviar\n\n${mensagem}`);
+      } else {
+        Alert.alert("Erro ao enviar", mensagem);
+      }
     } finally {
       setSending(false);
     }

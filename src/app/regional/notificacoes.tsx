@@ -16,6 +16,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 
+import { AnexosNotificacao } from "@/components/AnexosNotificacao";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 
 import {
@@ -611,6 +612,8 @@ function NotificacaoDetailModal({
               {item.descricao || "Não informado"}
             </Text>
           </View>
+
+          <AnexosNotificacao midias={item.media_urls} />
 
           {item.endereco && (
             <View style={styles.detailSection}>

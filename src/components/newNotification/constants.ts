@@ -132,6 +132,7 @@ export interface MediaAnexo {
   name: string;
   type: string;
   thumb?: string;
+  size?: number | null;
 }
 
 

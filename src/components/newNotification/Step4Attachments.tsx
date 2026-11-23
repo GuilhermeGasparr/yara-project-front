@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Alert,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,9 +11,16 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { File as ArquivoExpo } from "expo-file-system";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { WizardNavButtons } from "./WizardNavButtons";
 import { MediaAnexo, WizardData } from "./constants";
+import {
+  formatarTamanho,
+  MIME_DOCUMENTOS,
+  validarAnexo,
+  type TipoMidia,
+} from "@/utils/midias";
 
 interface Props {
   data: WizardData;
@@ -27,14 +35,43 @@ interface AnexoOption {
   action: () => void;
 }
 
+// Nem todo seletor informa o tamanho. Se não der para descobrir, devolve null
+// e o backend faz a checagem no envio.
+async function descobrirTamanho(uri: string, informado?: number | null) {
+  if (informado != null) return informado;
+
+  try {
+    if (Platform.OS === "web") {
+      const resposta = await fetch(uri);
+      return (await resposta.blob()).size;
+    }
+    // File implementa Blob, mas a tipagem do SDK não expõe `size`
+    return (new ArquivoExpo(uri) as unknown as Blob).size ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
   const [loading, setLoading] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null);
 
-  function addMedia(item: MediaAnexo) {
-    onChange({ medias: [...data.medias, item] });
+  async function addMedia(
+    item: MediaAnexo,
+    categoria: TipoMidia,
+    tamanhoInformado?: number | null,
+  ) {
+    const size = await descobrirTamanho(item.uri, tamanhoInformado);
+    const erro = validarAnexo(item.name, size, categoria);
+
+    setErroAnexo(erro);
+    if (erro) return;
+
+    onChange({ medias: [...data.medias, { ...item, size }] });
   }
 
   function removeMedia(index: number) {
+    setErroAnexo(null);
     const updated = data.medias.filter((_, i) => i !== index);
     onChange({ medias: updated });
   }
@@ -51,7 +88,11 @@ export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      addMedia({ uri: asset.uri, name: asset.fileName ?? "foto.jpg", type: "image/jpeg", thumb: asset.uri });
+      await addMedia(
+        { uri: asset.uri, name: asset.fileName ?? "foto.jpg", type: "image/jpeg", thumb: asset.uri },
+        "imagem",
+        asset.fileSize,
+      );
     }
   }
 
@@ -64,15 +105,23 @@ export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      addMedia({ uri: asset.uri, name: asset.fileName ?? "video.mp4", type: "video/mp4" });
+      await addMedia(
+        { uri: asset.uri, name: asset.fileName ?? "video.mp4", type: "video/mp4" },
+        "video",
+        asset.fileSize,
+      );
     }
   }
 
   async function pickDocument() {
-    const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: MIME_DOCUMENTOS, copyToCacheDirectory: true });
     if (result.assets && result.assets[0]) {
       const asset = result.assets[0];
-      addMedia({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? "application/octet-stream" });
+      await addMedia(
+        { uri: asset.uri, name: asset.name, type: asset.mimeType ?? "application/octet-stream" },
+        "documento",
+        asset.size,
+      );
     }
   }
 
@@ -87,6 +136,9 @@ export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
       <Text style={styles.heading}>Anexos</Text>
       <Text style={styles.sub}>
         Adicione fotos, vídeos ou documentos. A geolocalização será capturada automaticamente.
+      </Text>
+      <Text style={styles.limites}>
+        Fotos (JPG, PNG, WEBP, HEIC) até 10 MB · Vídeos (MP4, MOV, WEBM, 3GP) até 100 MB · Documentos (PDF, DOC, DOCX) até 10 MB
       </Text>
 
       {/* Botões de anexar */}
@@ -104,6 +156,12 @@ export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
         ))}
       </View>
 
+      {erroAnexo && (
+        <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Text style={styles.erroTexto}>{erroAnexo}</Text>
+        </View>
+      )}
+
       {/* Lista de anexados */}
       {data.medias.length > 0 && (
         <View style={styles.anexadosList}>
@@ -120,6 +178,9 @@ export function Step4Anexos({ data, onChange, onNext, onBack }: Props) {
                 </View>
               )}
               <Text style={styles.anexadoName} numberOfLines={1}>{m.name}</Text>
+              {m.size != null && (
+                <Text style={styles.anexadoTamanho}>{formatarTamanho(m.size)}</Text>
+              )}
               <TouchableOpacity onPress={() => removeMedia(i)} hitSlop={8}>
                 <Text style={styles.removeBtn}>✕</Text>
               </TouchableOpacity>
@@ -152,6 +213,28 @@ const styles = StyleSheet.create({
     color: Colors.gray400,
     marginBottom: Spacing.lg,
     lineHeight: 20,
+  },
+  limites: {
+    fontSize: FontSize.xs,
+    color: Colors.gray600,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.lg,
+    lineHeight: 16,
+  },
+  erroBox: {
+    backgroundColor: Colors.red50,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  erroTexto: {
+    fontSize: FontSize.sm,
+    color: Colors.red600,
+    lineHeight: 18,
+  },
+  anexadoTamanho: {
+    fontSize: FontSize.xs,
+    color: Colors.gray400,
   },
   optionsRow: {
     flexDirection: "row",

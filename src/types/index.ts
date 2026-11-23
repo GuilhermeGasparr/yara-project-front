@@ -68,6 +68,13 @@ export interface LoginResponse {
   usuario: LoginUsuario;
 }
 
+export interface MidiaNotificacao {
+  id: number;
+  url: string;
+  resource_type?: string | null;
+  nome_arquivo?: string | null;
+}
+
 export interface ApiError {
   detail: string;
 }

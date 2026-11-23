@@ -5,6 +5,7 @@ import { DeleteNotificationButton } from "@/components/DeleteNotificationButton"
 import { NotificationRow } from "@/components/NotificationRow";
 import { QuickActionButton } from "@/components/QuickActionbutton";
 import { StatsCard } from "@/components/StatsCard";
+import { AnexosNotificacao } from "@/components/AnexosNotificacao";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useFocusEffect } from "expo-router";
@@ -635,6 +636,8 @@ function NotificacaoDetailModal({
                   {item.descricao || "Não informado"}
                 </Text>
               </View>
+
+              <AnexosNotificacao midias={item.media_urls} />
               {/* ENDEREÇO */}
               {item.endereco && (
                 <View style={styles.detailSection}>

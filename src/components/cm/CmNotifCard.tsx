@@ -32,7 +32,7 @@ const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> =
     ENCERRADO: { label: "Encerrado", bg: "#e1dfe9", color: "#082367" },
   };
 
-function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status }: { status: string }) {
   const config = STATUS_CFG[normalizar(status)] ?? {
     label: status,
     bg: Colors.gray50,

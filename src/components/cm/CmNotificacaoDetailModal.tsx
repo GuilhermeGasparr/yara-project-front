@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { AnexosNotificacao } from "@/components/AnexosNotificacao";
 import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
 import {
   baixarRelatorioNotificacaoXlsx,
@@ -231,6 +232,8 @@ export function CmNotificacaoDetailModal({
               </View>
             </>
           )}
+
+          <AnexosNotificacao midias={notif.media_urls} />
 
           {/* Ações de status */}
           <Text style={s.detailSectionLabel}>Alterar status</Text>
