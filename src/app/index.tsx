@@ -53,7 +53,7 @@ function RoleSelector({
   const roles = [
     { value: "ACS/ACE", label: "ACS / ACE", icon: "users" },
     { value: "UBS", label: "Equipe UBS", icon: "home" },
-    { value: "CM", label: "Vigilante Municipal", icon: "briefcase" },
+    { value: "CM", label: "Vig. Municipal", icon: "briefcase" },
     { value: "VR", label: "Vig. Regional", icon: "map" },
     { value: "VE", label: "Vig. Estadual", icon: "globe" },
   ] as const;

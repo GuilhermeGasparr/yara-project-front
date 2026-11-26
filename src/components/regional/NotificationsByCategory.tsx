@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import type { CategoriaResumo } from "@/utils/regionalDashboard";
+import { CategoryColors, Colors } from "@/constants/theme";
+import { normalizar, type CategoriaResumo } from "@/utils/regionalDashboard";
 
 interface NotificationsByCategoryProps {
   data: CategoriaResumo[];
@@ -9,6 +10,11 @@ interface NotificationsByCategoryProps {
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
+
+// Mesma paleta do gráfico do Vigilante Estadual
+const corDaCategoria = (categoria: string): string =>
+  CategoryColors[normalizar(categoria) as keyof typeof CategoryColors] ??
+  Colors.gray600;
 
 export default function NotificationsByCategory({
   data,
@@ -25,9 +31,9 @@ export default function NotificationsByCategory({
         ? `${item.categoria.substring(0, 7)}...` 
         : item.categoria,
       fullLabel: item.categoria, // Mantém o nome completo para tooltips/legendas se necessário
-      frontColor: "#087F5B",
+      frontColor: corDaCategoria(item.categoria),
       topLabelComponent: () => (
-        <Text style={{ color: "#087F5B", fontSize: 10, fontWeight: "700", marginBottom: 4 }}>
+        <Text style={{ color: Colors.gray800, fontSize: 10, fontWeight: "700", marginBottom: 4 }}>
           {porcentagem.toFixed(0)}%
         </Text>
       ),
@@ -71,7 +77,12 @@ export default function NotificationsByCategory({
             <View style={styles.legendContainer}>
               {data.map((item) => (
                 <View key={item.categoria} style={styles.legendItem}>
-                  <View style={styles.legendDot} />
+                  <View
+                    style={[
+                      styles.legendDot,
+                      { backgroundColor: corDaCategoria(item.categoria) },
+                    ]}
+                  />
                   <Text style={styles.legendText} numberOfLines={1}>
                     <Text style={{ fontWeight: "600" }}>{item.categoria}:</Text> {item.quantidade} {item.quantidade === 1 ? "notificação" : "notificações"}
                   </Text>
@@ -156,7 +167,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#087F5B",
     marginRight: 8,
   },
 

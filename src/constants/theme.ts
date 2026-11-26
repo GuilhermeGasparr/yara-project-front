@@ -25,6 +25,13 @@ export const Colors = {
   bg:    '#F4F8F6',
 } as const;
 
+// Cores das categorias de notificação (gráficos regional e estadual)
+export const CategoryColors = {
+  DOENCA:    '#C62828',
+  EPIZOOTIA: '#A15C00',
+  DESASTRE:  '#1261A0',
+} as const;
+
 export const Spacing = {
   xs:  4,
   sm:  8,

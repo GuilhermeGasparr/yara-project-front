@@ -1,10 +1,10 @@
-import type { MidiaNotificacao } from "@/types";
+import { getItem } from "@/utils/storage";
 import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 import { normalizarNotificacoes } from "@/utils/status";
-import { getItem } from "@/utils/storage";
 import { Platform } from "react-native";
-const BASE_URL = "https://yara-project.onrender.com";
-// const BASE_URL = "http://localhost:8000";
+import type { MidiaNotificacao } from "@/types";
+// const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

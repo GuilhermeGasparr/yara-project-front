@@ -1,10 +1,10 @@
-import type { MidiaNotificacao } from "@/types";
-import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
-import { normalizarNotificacoes } from "@/utils/status";
 import { getItem } from "@/utils/storage";
+import type { MidiaNotificacao } from "@/types";
+import { normalizarNotificacoes } from "@/utils/status";
+import { montarQueryRelatorio, type FiltrosRelatorio } from "@/utils/filtros";
 
-const BASE_URL = "https://yara-project.onrender.com";
-// const BASE_URL = "http://localhost:8000";
+// const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 const SKIP = { "ngrok-skip-browser-warning": "true" };
 
