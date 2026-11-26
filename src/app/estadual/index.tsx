@@ -1,6 +1,12 @@
 import { AllNotificationsButton } from "@/components/AllNotificationsButton";
 import { StatsCard } from "@/components/StatsCard";
-import { Colors, FontSize, Radius, Spacing } from "@/constants/theme";
+import {
+  CategoryColors,
+  Colors,
+  FontSize,
+  Radius,
+  Spacing,
+} from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import type { Notificacao } from "@/services/NotificationService";
 import { listarNotificacoesVE } from "@/services/VeService";
@@ -59,15 +65,15 @@ const CATEGORIA_CFG: Record<
 > = {
   DOENCA: {
     label: "Doenças",
-    color: "#C62828",
+    color: CategoryColors.DOENCA,
   },
   EPIZOOTIA: {
     label: "Epizootias",
-    color: "#A15C00",
+    color: CategoryColors.EPIZOOTIA,
   },
   DESASTRE: {
     label: "Desastres",
-    color: "#1261A0",
+    color: CategoryColors.DESASTRE,
   },
 };
 

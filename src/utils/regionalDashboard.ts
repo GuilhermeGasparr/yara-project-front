@@ -26,7 +26,7 @@ export interface RegionalDashboardData {
   porStatus: StatusResumo[];
 }
 
-const normalizar = (valor?: string) =>
+export const normalizar = (valor?: string) =>
   valor
     ?.trim()
     .toUpperCase()

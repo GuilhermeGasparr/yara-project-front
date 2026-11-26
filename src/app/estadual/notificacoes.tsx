@@ -173,14 +173,12 @@ function NotificationCard({ item, onPress }: NotificationCardProps) {
   const categoria = getCategoriaStyle(item.categoria);
   const status = getStatusStyle(item.status);
 
-  const isPending = normalizar(item.status) === "EM ANDAMENTO";
-
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.notificationCard,
-        isPending && styles.notificationCardPending,
+        { borderLeftColor: categoria.dot },
         pressed && styles.notificationCardPressed,
       ]}
     >
@@ -1191,6 +1189,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: "rgba(15,110,86,0.08)",
+    borderLeftWidth: 3,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1199,11 +1198,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
-  },
-
-  notificationCardPending: {
-    borderLeftWidth: 3,
-    borderLeftColor: "#BA7517",
   },
 
   notificationCardPressed: {

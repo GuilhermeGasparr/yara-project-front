@@ -21,8 +21,8 @@ import {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://yara-project.onrender.com";
-// const BASE_URL = "http://localhost:8000";
+// const BASE_URL = "https://yara-project.onrender.com";
+const BASE_URL = "http://localhost:8000";
 
 async function criarCoordenadorMunicipal(payload: {
   nome: string;
@@ -42,9 +42,7 @@ async function criarCoordenadorMunicipal(payload: {
   });
   const data = await res.json();
   if (!res.ok)
-    throw new Error(
-      data.detail ?? "Erro ao criar conta do Vigilante Municipal.",
-    );
+    throw new Error(data.detail ?? "Erro ao criar conta do Vigilante Municipal.");
 }
 
 // ─── Campo animado ────────────────────────────────────────────────────────────
@@ -232,8 +230,8 @@ function SuccessOverlay({
         <Text style={styles.successEmoji}>✓</Text>
         <Text style={styles.successTitle}>Conta criada!</Text>
         <Text style={styles.successSub}>
-          O(A) Vigilante <Text style={{ fontWeight: "700" }}>{nome}</Text> foi
-          cadastrado(a) com sucesso no sistema.
+          O(A) Vigilante <Text style={{ fontWeight: "700" }}>{nome}</Text>{" "}
+          foi cadastrado(a) com sucesso no sistema.
         </Text>
         <TouchableOpacity
           style={styles.successBtn}
@@ -416,14 +414,12 @@ export default function CreateCMScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.infoEmoji}>🏛️</Text>
             <Text style={styles.infoText}>
-              Cadastre um novo Vigilante Municipal. Ele poderá acessar o painel
-              municipal com as credenciais informadas.
+              Cadastre um novo Vigilante Municipal. Ele poderá acessar o
+              painel municipal com as credenciais informadas.
             </Text>
           </View>
 
-          <Text style={styles.sectionLabel}>
-            Informações do Vigilante Municipal
-          </Text>
+          <Text style={styles.sectionLabel}>Informações do Vigilante Municipal</Text>
 
           <AnimatedField
             label="Nome do Vigilante Municipal"
@@ -495,9 +491,7 @@ export default function CreateCMScreen() {
           {/* Resumo do cadastro */}
           {(form.nome || form.municipio) && (
             <View style={styles.previewCard}>
-              <Text style={styles.previewLabel}>
-                Resumo do Vigilante Municipal
-              </Text>
+              <Text style={styles.previewLabel}>Resumo do Vigilante Municipal</Text>
               <View style={styles.previewRow}>
                 <Text style={styles.previewKey}>Nome</Text>
                 <Text style={styles.previewVal}>{form.nome || "—"}</Text>
